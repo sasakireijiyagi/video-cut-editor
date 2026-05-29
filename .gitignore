@@ -1,0 +1,6 @@
+.DS_Store
+.Rhistory
+VideoCutEditor.app/
+run.sh
+__pycache__/
+*.pyc
