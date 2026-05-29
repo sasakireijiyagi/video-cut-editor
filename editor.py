@@ -727,8 +727,7 @@ class MainWindow(QMainWindow):
         self.btn_donate.setStyleSheet("color: #c0392b; font-size: 11px;")
         self.btn_donate.setFlat(True)
         self.btn_donate.setToolTip(tr('donate_tip'))
-        self.btn_donate.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl("https://donate.sasakireijiyagi.com/")))
+        self.btn_donate.clicked.connect(self._open_donate)
 
         for w in (self.btn_video, self.lbl_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
             bar.addWidget(w)
@@ -847,6 +846,29 @@ class MainWindow(QMainWindow):
         vbox.addWidget(self.log)
 
     # ── 言語切り替え ──────────────────────────────────
+
+    def _open_donate(self):
+        import urllib.parse as up
+        if _lang == 'en':
+            to   = "jbzkeiri1@jimu.kyushu-u.ac.jp"
+            subj = "Donation request for Reiji Sasaki (Kyushu University)"
+            body = (
+                "Dear Accounting Division,\n\n"
+                "I would like to make a donation in support of the research activities "
+                "of Reiji Sasaki (Graduate School of Human-Environment Studies, "
+                "Clinical Psychology).\n\n"
+                "Could you please provide me with the necessary information and "
+                "procedures to complete the donation?\n\n"
+                "Thank you very much.\n\n"
+                "---\n"
+                "Name:\n"
+                "Email:\n"
+                "Donation amount (JPY):\n"
+            )
+            mailto = f"mailto:{to}?subject={up.quote(subj)}&body={up.quote(body).replace('%0A','%0D%0A')}"
+            QDesktopServices.openUrl(QUrl(mailto))
+        else:
+            QDesktopServices.openUrl(QUrl("https://donate.sasakireijiyagi.com/"))
 
     def _toggle_lang(self):
         global _lang
