@@ -49,6 +49,135 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 
 # ──────────────────────────────────────────────────────────────────
+# 言語辞書 / String dictionary
+# ──────────────────────────────────────────────────────────────────
+
+STRINGS = {
+    'ja': {
+        'window_title'      : 'Video Cut Editor  —  by Reiji Sasaki',
+        'open_video'        : '動画を開く…',
+        'open_srt'          : 'SRTを開く…',
+        'save_srt'          : 'SRT保存',
+        'save_srt_tip'      : '編集内容をSRTファイルに上書き保存',
+        'donate'            : '❤ 開発を支援する',
+        'donate_tip'        : '寄付ページを開きます',
+        'video_none'        : '動画: 未選択',
+        'srt_none'          : 'SRT: 未選択',
+        'video_label'       : '動画: {name}',
+        'srt_label'         : 'SRT: {name}',
+        'transcribe_label'  : '文字起こし:',
+        'model_label'       : 'モデル:',
+        'lang_label'        : '言語:',
+        'model_tip'         : 'Whisper モデル  ★=ローカル済み（すぐ使える）',
+        'lang_tip'          : '文字起こし言語',
+        'transcribe_btn'    : '🎙 文字起こし実行',
+        'transcribe_cancel' : '中止',
+        'mark_silence'      : '[間]を記録',
+        'mark_silence_tip'  : '発話間の無音区間をSRTに[間 X.X秒]として挿入する',
+        'silence_suffix'    : ' 秒以上',
+        'silence_tip'       : 'この秒数以上の無音を[間]として記録する',
+        'output_group'      : '出力設定',
+        'combine'           : '1ファイルに結合',
+        'separate'          : '行ごとに別ファイル',
+        'reencode'          : '再エンコード (libx264/aac) — 遅いが正確',
+        'output_dir'        : '出力先:',
+        'browse'            : '参照…',
+        'execute'           : '▶  ffmpegカット実行',
+        'cancel'            : 'キャンセル',
+        'select_all'        : '全選択',
+        'deselect_all'      : '全解除',
+        'tbl_headers'       : ['✓', '開始', '終了', 'テキスト'],
+        'count_fmt'         : '{checked} / {total} 件  |  合計 {dur}',
+        'play'              : '▶ 再生',
+        'pause'             : '⏸ 一時停止',
+        'stop'              : '⏹ 停止',
+        'menu_help'         : 'ヘルプ',
+        'menu_about'        : 'このソフトウェアについて',
+        'about_title'       : 'このソフトウェアについて',
+        'about_donate_link' : '開発を支援する（寄付）',
+        'dlg_open_video'    : '動画ファイルを選択',
+        'dlg_video_filter'  : '動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;すべて (*)',
+        'dlg_open_srt'      : 'SRTファイルを選択',
+        'dlg_srt_filter'    : 'SRT (*.srt);;すべて (*)',
+        'dlg_save_srt'      : 'SRTファイルを保存',
+        'dlg_output_dir'    : '出力先ディレクトリを選択',
+        'err_no_video'      : '動画ファイルを開いてください',
+        'err_no_segments'   : '1つ以上のセグメントを選択してください',
+        'err_title'         : 'エラー',
+        'done_title'        : '完了',
+        'log_srt_loaded'    : 'SRT読み込み完了: {n} セグメント — {path}',
+        'log_srt_saved'     : 'SRT保存: {path}',
+        'log_transcribe_start': '--- 文字起こし開始: {name} ---',
+        'log_transcribe_done' : '--- 文字起こし完了 → {path} ---',
+        'lang_toggle'       : 'EN',
+    },
+    'en': {
+        'window_title'      : 'Video Cut Editor  —  by Reiji Sasaki',
+        'open_video'        : 'Open Video…',
+        'open_srt'          : 'Open SRT…',
+        'save_srt'          : 'Save SRT',
+        'save_srt_tip'      : 'Overwrite and save edits to SRT file',
+        'donate'            : '❤ Support Development',
+        'donate_tip'        : 'Open donation page',
+        'video_none'        : 'Video: Not selected',
+        'srt_none'          : 'SRT: Not selected',
+        'video_label'       : 'Video: {name}',
+        'srt_label'         : 'SRT: {name}',
+        'transcribe_label'  : 'Transcribe:',
+        'model_label'       : 'Model:',
+        'lang_label'        : 'Language:',
+        'model_tip'         : 'Whisper model  ★=already downloaded',
+        'lang_tip'          : 'Transcription language',
+        'transcribe_btn'    : '🎙 Run Transcription',
+        'transcribe_cancel' : 'Stop',
+        'mark_silence'      : 'Record [Pause]',
+        'mark_silence_tip'  : 'Insert [Pause X.Xs] entries for silent gaps in SRT',
+        'silence_suffix'    : ' sec or more',
+        'silence_tip'       : 'Record silence longer than this as [Pause]',
+        'output_group'      : 'Output Settings',
+        'combine'           : 'Combine into one file',
+        'separate'          : 'Separate file per segment',
+        'reencode'          : 'Re-encode (libx264/aac) — slower but precise',
+        'output_dir'        : 'Output:',
+        'browse'            : 'Browse…',
+        'execute'           : '▶  Cut with ffmpeg',
+        'cancel'            : 'Cancel',
+        'select_all'        : 'Select All',
+        'deselect_all'      : 'Deselect All',
+        'tbl_headers'       : ['✓', 'Start', 'End', 'Text'],
+        'count_fmt'         : '{checked} / {total} selected  |  Total {dur}',
+        'play'              : '▶ Play',
+        'pause'             : '⏸ Pause',
+        'stop'              : '⏹ Stop',
+        'menu_help'         : 'Help',
+        'menu_about'        : 'About',
+        'about_title'       : 'About Video Cut Editor',
+        'about_donate_link' : 'Support Development (Donate)',
+        'dlg_open_video'    : 'Select video file',
+        'dlg_video_filter'  : 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;All (*)',
+        'dlg_open_srt'      : 'Select SRT file',
+        'dlg_srt_filter'    : 'SRT (*.srt);;All (*)',
+        'dlg_save_srt'      : 'Save SRT file',
+        'dlg_output_dir'    : 'Select output directory',
+        'err_no_video'      : 'Please open a video file first.',
+        'err_no_segments'   : 'Please select at least one segment.',
+        'err_title'         : 'Error',
+        'done_title'        : 'Done',
+        'log_srt_loaded'    : 'SRT loaded: {n} segments — {path}',
+        'log_srt_saved'     : 'SRT saved: {path}',
+        'log_transcribe_start': '--- Transcription started: {name} ---',
+        'log_transcribe_done' : '--- Transcription complete → {path} ---',
+        'lang_toggle'       : 'JA',
+    },
+}
+
+_lang = 'ja'
+
+def tr(key: str) -> str:
+    return STRINGS[_lang].get(key, key)
+
+
+# ──────────────────────────────────────────────────────────────────
 # SRT utilities
 # ──────────────────────────────────────────────────────────────────
 
@@ -77,7 +206,6 @@ def _ms_to_srt(ms: int) -> str:
 
 
 def _ms_to_ffmpeg(ms: int) -> str:
-    """HH:MM:SS.mmm  (for -ss / -t)"""
     h, r = divmod(ms, 3_600_000)
     mi, r = divmod(r, 60_000)
     s, ms = divmod(r, 1_000)
@@ -117,106 +245,6 @@ def parse_srt(text: str) -> List[SRTEntry]:
 # ffmpeg worker
 # ──────────────────────────────────────────────────────────────────
 
-class FFmpegWorker(QThread):
-    progress = pyqtSignal(int)        # 完了セグメント数
-    log      = pyqtSignal(str)
-    done     = pyqtSignal(bool, str)  # (成功, メッセージ)
-
-    def __init__(self, entries: List[SRTEntry], video: str,
-                 outdir: str, combine: bool, reencode: bool):
-        super().__init__()
-        self.entries  = entries
-        self.video    = video
-        self.outdir   = outdir
-        self.combine  = combine
-        self.reencode = reencode
-        self._stop    = False
-
-    def cancel(self):
-        self._stop = True
-
-    def run(self):
-        checked = [e for e in self.entries if e.checked]
-        if not checked:
-            self.done.emit(False, "選択されたセグメントがありません")
-            return
-
-        # 同一インデックスの重複を除去
-        seen = set()
-        deduped = []
-        for e in checked:
-            if e.index not in seen:
-                seen.add(e.index)
-                deduped.append(e)
-        if len(deduped) != len(checked):
-            self.log.emit(f"  重複エントリを除去: {len(checked)} → {len(deduped)} 件")
-        checked = deduped
-
-        self.log.emit(f"  カット対象: {len(checked)} セグメント")
-        os.makedirs(self.outdir, exist_ok=True)
-        stem = Path(self.video).stem
-
-        codec = (['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac']
-                 if self.reencode else ['-c', 'copy'])
-
-        segs: List[str] = []
-        for i, entry in enumerate(checked):
-            if self._stop:
-                self.done.emit(False, "キャンセルされました")
-                return
-
-            start  = _ms_to_ffmpeg(entry.start_ms)
-            dur    = _ms_to_ffmpeg(entry.end_ms - entry.start_ms)
-            out    = os.path.join(self.outdir, f"{stem}_{entry.index:04d}.mp4")
-
-            cmd = [FFMPEG_BIN, '-y',
-                   '-ss', start, '-i', self.video,
-                   '-t', dur,
-                   '-avoid_negative_ts', 'make_zero',
-                   *codec, out]
-
-            self.log.emit(f"[{i+1}/{len(checked)}] seg {entry.index}  {start} + {dur}")
-            proc = subprocess.run(cmd, capture_output=True, text=True)
-            if proc.returncode != 0:
-                self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
-                self.done.emit(False, f"セグメント {entry.index} でエラーが発生しました")
-                return
-
-            segs.append(out)
-            self.progress.emit(i + 1)
-
-        if self.combine and len(segs) > 1:
-            listfile = os.path.join(self.outdir, '_concat.txt')
-            with open(listfile, 'w') as f:
-                for p in segs:
-                    f.write(f"file '{p}'\n")
-
-            final = os.path.join(self.outdir, f"{stem}_combined.mp4")
-            cmd = [FFMPEG_BIN, '-y', '-f', 'concat', '-safe', '0',
-                   '-i', listfile, '-c', 'copy', final]
-            self.log.emit("結合中...")
-            proc = subprocess.run(cmd, capture_output=True, text=True)
-            os.remove(listfile)
-            for p in segs:
-                try:
-                    os.remove(p)
-                except OSError:
-                    pass
-
-            if proc.returncode != 0:
-                self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
-                self.done.emit(False, "結合に失敗しました")
-                return
-
-            self.done.emit(True, f"完了: {final}")
-        else:
-            self.done.emit(True, f"完了: {len(segs)} ファイルを {self.outdir} に保存しました")
-
-
-# ──────────────────────────────────────────────────────────────────
-# Whisper worker
-# ──────────────────────────────────────────────────────────────────
-
 def _find_ffmpeg() -> str:
     for p in ['/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']:
         if os.path.isfile(p):
@@ -251,19 +279,119 @@ _LANG_MAP = {
     '自動検出': 'auto',
 }
 
+
+class FFmpegWorker(QThread):
+    progress = pyqtSignal(int)
+    log      = pyqtSignal(str)
+    done     = pyqtSignal(bool, str)
+
+    def __init__(self, entries: List[SRTEntry], video: str,
+                 outdir: str, combine: bool, reencode: bool):
+        super().__init__()
+        self.entries  = entries
+        self.video    = video
+        self.outdir   = outdir
+        self.combine  = combine
+        self.reencode = reencode
+        self._stop    = False
+
+    def cancel(self):
+        self._stop = True
+
+    def run(self):
+        checked = [e for e in self.entries if e.checked]
+        if not checked:
+            self.done.emit(False, "No segments selected." if _lang == 'en' else "選択されたセグメントがありません")
+            return
+
+        # 重複除去
+        seen, deduped = set(), []
+        for e in checked:
+            if e.index not in seen:
+                seen.add(e.index)
+                deduped.append(e)
+        if len(deduped) != len(checked):
+            self.log.emit(f"  {'Duplicate entries removed' if _lang=='en' else '重複エントリを除去'}: {len(checked)} → {len(deduped)}")
+        checked = deduped
+
+        self.log.emit(f"  {'Processing' if _lang=='en' else 'カット対象'}: {len(checked)} segments")
+        os.makedirs(self.outdir, exist_ok=True)
+        stem = Path(self.video).stem
+        codec = (['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac']
+                 if self.reencode else ['-c', 'copy'])
+
+        segs: List[str] = []
+        for i, entry in enumerate(checked):
+            if self._stop:
+                self.done.emit(False, "Cancelled." if _lang == 'en' else "キャンセルされました")
+                return
+
+            start = _ms_to_ffmpeg(entry.start_ms)
+            dur   = _ms_to_ffmpeg(entry.end_ms - entry.start_ms)
+            out   = os.path.join(self.outdir, f"{stem}_{entry.index:04d}.mp4")
+
+            cmd = [FFMPEG_BIN, '-y',
+                   '-ss', start, '-i', self.video,
+                   '-t', dur,
+                   '-avoid_negative_ts', 'make_zero',
+                   *codec, out]
+
+            self.log.emit(f"[{i+1}/{len(checked)}] seg {entry.index}  {start} + {dur}")
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.returncode != 0:
+                self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
+                self.done.emit(False, f"{'Error on segment' if _lang=='en' else 'セグメントでエラー'} {entry.index}")
+                return
+
+            segs.append(out)
+            self.progress.emit(i + 1)
+
+        if self.combine and len(segs) > 1:
+            listfile = os.path.join(self.outdir, '_concat.txt')
+            with open(listfile, 'w') as f:
+                for p in segs:
+                    f.write(f"file '{p}'\n")
+
+            final = os.path.join(self.outdir, f"{stem}_combined.mp4")
+            cmd = [FFMPEG_BIN, '-y', '-f', 'concat', '-safe', '0',
+                   '-i', listfile, '-c', 'copy', final]
+            self.log.emit("Combining..." if _lang == 'en' else "結合中...")
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            os.remove(listfile)
+            for p in segs:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+            if proc.returncode != 0:
+                self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
+                self.done.emit(False, "Concat failed." if _lang == 'en' else "結合に失敗しました")
+                return
+
+            self.done.emit(True, f"{'Done' if _lang=='en' else '完了'}: {final}")
+        else:
+            self.done.emit(True,
+                f"{'Done' if _lang=='en' else '完了'}: {len(segs)} {'file(s) saved to' if _lang=='en' else 'ファイルを'} {self.outdir}{'.' if _lang=='en' else ' に保存しました'}")
+
+
+# ──────────────────────────────────────────────────────────────────
+# Whisper worker
+# ──────────────────────────────────────────────────────────────────
+
 class WhisperWorker(QThread):
     log  = pyqtSignal(str)
-    done = pyqtSignal(bool, str)  # (成功, SRTパス or エラーメッセージ)
+    done = pyqtSignal(bool, str)
 
     def __init__(self, video: str, model: str, language: str,
                  mark_silence: bool = False, silence_sec: float = 1.0):
         super().__init__()
-        self.video         = video
-        self.model         = model
-        self.language      = language
-        self.mark_silence  = mark_silence
-        self.silence_ms    = int(silence_sec * 1000)
-        self._proc         = None
+        self.video        = video
+        self.model        = model
+        self.language     = language
+        self.mark_silence = mark_silence
+        self.silence_ms   = int(silence_sec * 1000)
+        self._proc        = None
 
     def cancel(self):
         if self._proc:
@@ -278,11 +406,10 @@ class WhisperWorker(QThread):
         if self.language != 'auto':
             cmd += ['--language', self.language]
 
-        self.log.emit(f"Whisper 開始: model={self.model}  lang={self.language}")
+        self.log.emit(f"Whisper: model={self.model}  lang={self.language}")
 
-        # whisper が内部で ffmpeg を呼ぶので PATH に追加しておく
         env = os.environ.copy()
-        env['PATH'] = '/usr/local/bin:' + env.get('PATH', '')
+        env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
 
         try:
             self._proc = subprocess.Popen(
@@ -299,27 +426,20 @@ class WhisperWorker(QThread):
             return
 
         if self._proc.returncode != 0:
-            self.done.emit(False, f"whisper がエラーで終了しました (code {self._proc.returncode})")
+            self.done.emit(False, f"whisper exited with error (code {self._proc.returncode})")
             return
 
-        # 出力SRTを探す
         stem = Path(self.video).stem
         outdir_path = Path(outdir)
-        self.log.emit(f"  SRTを探しています: {outdir_path / (stem + '.srt')}")
-
-        # 1. 期待パスで探す
         srt = outdir_path / (stem + '.srt')
-        # 2. glob で拾う（whisper がファイル名を変える場合に備えて）
         if not srt.exists():
             hits = sorted(outdir_path.glob('*.srt'), key=lambda p: p.stat().st_mtime, reverse=True)
-            self.log.emit(f"  glob結果: {[str(p) for p in hits]}")
             srt = hits[0] if hits else srt
 
         if not srt.exists():
-            self.done.emit(False, f"SRTが見つかりませんでした: {srt}")
+            self.done.emit(False, f"SRT not found: {srt}")
             return
 
-        # ── [間] 挿入後処理 ──────────────────────────────
         if self.mark_silence:
             entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
             new_entries = []
@@ -328,13 +448,13 @@ class WhisperWorker(QThread):
                 if i + 1 < len(entries):
                     gap_ms = entries[i + 1].start_ms - entry.end_ms
                     if gap_ms >= self.silence_ms:
+                        label = f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
                         new_entries.append(SRTEntry(
                             index=0,
                             start_ms=entry.end_ms,
                             end_ms=entries[i + 1].start_ms,
-                            text=f'[間  {gap_ms / 1000:.1f}秒]',
+                            text=label,
                         ))
-            # 連番振り直し
             for idx, e in enumerate(new_entries):
                 e.index = idx + 1
             lines = []
@@ -345,7 +465,7 @@ class WhisperWorker(QThread):
                 lines.append('')
             srt.write_text('\n'.join(lines), encoding='utf-8')
             inserted = len(new_entries) - len(entries)
-            self.log.emit(f"  [間] を {inserted} 箇所挿入しました（{self.silence_ms/1000:.1f}秒以上）")
+            self.log.emit(f"  {'[Pause] inserted' if _lang=='en' else '[間] を挿入'}: {inserted} ({self.silence_ms/1000:.1f}{'s' if _lang=='en' else '秒'}+)")
 
         self.done.emit(True, str(srt))
 
@@ -367,19 +487,19 @@ class SRTTable(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
 
         bar = QHBoxLayout()
-        btn_all  = QPushButton("全選択")
-        btn_none = QPushButton("全解除")
-        self.lbl_count = QLabel("0 / 0 件選択")
-        btn_all.clicked.connect(self._all)
-        btn_none.clicked.connect(self._none)
-        bar.addWidget(btn_all)
-        bar.addWidget(btn_none)
+        self.btn_all  = QPushButton(tr('select_all'))
+        self.btn_none = QPushButton(tr('deselect_all'))
+        self.lbl_count = QLabel("")
+        self.btn_all.clicked.connect(self._all)
+        self.btn_none.clicked.connect(self._none)
+        bar.addWidget(self.btn_all)
+        bar.addWidget(self.btn_none)
         bar.addStretch()
         bar.addWidget(self.lbl_count)
         vbox.addLayout(bar)
 
         self.tbl = QTableWidget(0, 4)
-        self.tbl.setHorizontalHeaderLabels(['✓', '開始', '終了', 'テキスト'])
+        self.tbl.setHorizontalHeaderLabels(tr('tbl_headers'))
         hh = self.tbl.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -392,13 +512,15 @@ class SRTTable(QWidget):
         self.tbl.itemChanged.connect(self._on_changed)
         vbox.addWidget(self.tbl)
 
-    # public API ───────────────────────────────
+    def retranslate(self):
+        self.btn_all.setText(tr('select_all'))
+        self.btn_none.setText(tr('deselect_all'))
+        self.tbl.setHorizontalHeaderLabels(tr('tbl_headers'))
+        self._update_count()
 
     def load(self, entries: List[SRTEntry]):
         self.entries = entries
         self._repopulate()
-
-    # private ──────────────────────────────────
 
     def _repopulate(self):
         self.tbl.blockSignals(True)
@@ -451,14 +573,14 @@ class SRTTable(QWidget):
         self._update_count()
 
     def _update_count(self):
-        total        = len(self.entries)
-        checked      = sum(1 for e in self.entries if e.checked)
-        duration_ms  = sum(e.end_ms - e.start_ms for e in self.entries if e.checked)
+        total       = len(self.entries)
+        checked     = sum(1 for e in self.entries if e.checked)
+        duration_ms = sum(e.end_ms - e.start_ms for e in self.entries if e.checked)
         h, r  = divmod(duration_ms, 3_600_000)
         mi, r = divmod(r, 60_000)
         s     = r // 1_000
         dur_str = f"{h:02d}:{mi:02d}:{s:02d}" if h else f"{mi:02d}:{s:02d}"
-        self.lbl_count.setText(f"{checked} / {total} 件  |  合計 {dur_str}")
+        self.lbl_count.setText(tr('count_fmt').format(checked=checked, total=total, dur=dur_str))
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -492,9 +614,9 @@ class VideoPlayer(QWidget):
         vbox.addWidget(self.lbl_time)
 
         bar = QHBoxLayout()
-        self.btn_play  = QPushButton("▶ 再生")
-        self.btn_pause = QPushButton("⏸ 一時停止")
-        self.btn_stop  = QPushButton("⏹ 停止")
+        self.btn_play  = QPushButton(tr('play'))
+        self.btn_pause = QPushButton(tr('pause'))
+        self.btn_stop  = QPushButton(tr('stop'))
         self.btn_play.clicked.connect(self._play)
         self.btn_pause.clicked.connect(self._pause)
         self.btn_stop.clicked.connect(self._stop)
@@ -509,6 +631,11 @@ class VideoPlayer(QWidget):
         self.lbl_seg.setStyleSheet("color: #555; font-size: 11px;")
         vbox.addWidget(self.lbl_seg)
 
+    def retranslate(self):
+        self.btn_play.setText(tr('play'))
+        self.btn_pause.setText(tr('pause'))
+        self.btn_stop.setText(tr('stop'))
+
     def _setup_player(self):
         self.player = QMediaPlayer()
         self.audio  = QAudioOutput()
@@ -517,9 +644,7 @@ class VideoPlayer(QWidget):
         self.player.positionChanged.connect(self._on_pos)
         self.player.durationChanged.connect(self._on_dur)
         self.player.errorOccurred.connect(
-            lambda _err, msg: self.lbl_seg.setText(f"プレーヤーエラー: {msg}"))
-
-    # public API ───────────────────────────────
+            lambda _err, msg: self.lbl_seg.setText(f"Player error: {msg}"))
 
     def load(self, path: str):
         self.player.setSource(QUrl.fromLocalFile(path))
@@ -532,8 +657,6 @@ class VideoPlayer(QWidget):
         self.lbl_seg.setText(
             f"{_ms_to_srt(entry.start_ms)}  →  {_ms_to_srt(entry.end_ms)}\n"
             f"{entry.text[:120]}")
-
-    # private ──────────────────────────────────
 
     def _play(self):
         self.player.play()
@@ -571,7 +694,7 @@ class MainWindow(QMainWindow):
         self.srt_path:   Optional[str] = None
         self.worker: Optional[FFmpegWorker] = None
         self.whisper_worker: Optional[WhisperWorker] = None
-        self.setWindowTitle("Video Cut Editor  —  by Reiji Sasaki")
+        self.setWindowTitle(tr('window_title'))
         self.setMinimumSize(1100, 700)
         self._build()
         self._build_menu()
@@ -583,63 +706,75 @@ class MainWindow(QMainWindow):
 
         # ── ファイル選択バー ──────────────────────────
         bar = QHBoxLayout()
-        self.btn_video = QPushButton("動画を開く…")
-        self.btn_srt   = QPushButton("SRTを開く…")
-        self.lbl_video = QLabel("動画: 未選択")
-        self.lbl_srt   = QLabel("SRT: 未選択")
-        self.btn_save_srt = QPushButton("SRT保存")
+        self.btn_video    = QPushButton(tr('open_video'))
+        self.btn_srt      = QPushButton(tr('open_srt'))
+        self.lbl_video    = QLabel(tr('video_none'))
+        self.lbl_srt      = QLabel(tr('srt_none'))
+        self.btn_save_srt = QPushButton(tr('save_srt'))
         self.btn_save_srt.setEnabled(False)
-        self.btn_save_srt.setToolTip("編集内容をSRTファイルに上書き保存")
+        self.btn_save_srt.setToolTip(tr('save_srt_tip'))
         self.btn_video.clicked.connect(self._open_video)
         self.btn_srt.clicked.connect(self._open_srt)
         self.btn_save_srt.clicked.connect(self._save_srt)
-        btn_donate = QPushButton("❤ 開発を支援する")
-        btn_donate.setStyleSheet("color: #c0392b; font-size: 11px;")
-        btn_donate.setFlat(True)
-        btn_donate.setToolTip("寄付ページを開きます")
-        btn_donate.clicked.connect(
+
+        self.btn_lang = QPushButton(tr('lang_toggle'))
+        self.btn_lang.setFlat(True)
+        self.btn_lang.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self.btn_lang.setToolTip("Switch language / 言語切り替え")
+        self.btn_lang.clicked.connect(self._toggle_lang)
+
+        self.btn_donate = QPushButton(tr('donate'))
+        self.btn_donate.setStyleSheet("color: #c0392b; font-size: 11px;")
+        self.btn_donate.setFlat(True)
+        self.btn_donate.setToolTip(tr('donate_tip'))
+        self.btn_donate.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl("https://donate.sasakireijiyagi.com/")))
 
         for w in (self.btn_video, self.lbl_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
             bar.addWidget(w)
         bar.addStretch()
-        bar.addWidget(btn_donate)
+        bar.addWidget(self.btn_lang)
+        bar.addSpacing(8)
+        bar.addWidget(self.btn_donate)
         vbox.addLayout(bar)
 
         # ── Whisper 文字起こし行 ──────────────────────
         w_bar = QHBoxLayout()
-        w_bar.addWidget(QLabel("文字起こし:"))
+        self.lbl_transcribe = QLabel(tr('transcribe_label'))
+        w_bar.addWidget(self.lbl_transcribe)
 
         self.cmb_model = QComboBox()
         self.cmb_model.setMinimumWidth(180)
-        self.cmb_model.setToolTip("Whisper モデル  ★=ローカル済み（すぐ使える）")
+        self.cmb_model.setToolTip(tr('model_tip'))
         self._populate_models()
 
         self.cmb_lang = QComboBox()
         self.cmb_lang.addItems(list(_LANG_MAP.keys()))
-        self.cmb_lang.setToolTip("文字起こし言語")
+        self.cmb_lang.setToolTip(tr('lang_tip'))
 
-        self.btn_transcribe = QPushButton("🎙 文字起こし実行")
+        self.btn_transcribe = QPushButton(tr('transcribe_btn'))
         self.btn_transcribe.setEnabled(False)
         self.btn_transcribe.clicked.connect(self._transcribe)
 
-        self.btn_transcribe_cancel = QPushButton("中止")
+        self.btn_transcribe_cancel = QPushButton(tr('transcribe_cancel'))
         self.btn_transcribe_cancel.setEnabled(False)
         self.btn_transcribe_cancel.clicked.connect(self._cancel_transcribe)
 
-        self.chk_mark_silence = QCheckBox("[間]を記録")
-        self.chk_mark_silence.setToolTip("発話間の無音区間をSRTに[間 X.X秒]として挿入する")
+        self.chk_mark_silence = QCheckBox(tr('mark_silence'))
+        self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
 
         self.spn_silence = QDoubleSpinBox()
         self.spn_silence.setRange(0.5, 10.0)
         self.spn_silence.setSingleStep(0.5)
         self.spn_silence.setValue(1.0)
-        self.spn_silence.setSuffix(" 秒以上")
-        self.spn_silence.setToolTip("この秒数以上の無音を[間]として記録する")
+        self.spn_silence.setSuffix(tr('silence_suffix'))
+        self.spn_silence.setToolTip(tr('silence_tip'))
 
-        w_bar.addWidget(QLabel("モデル:"))
+        self.lbl_model = QLabel(tr('model_label'))
+        self.lbl_lang  = QLabel(tr('lang_label'))
+        w_bar.addWidget(self.lbl_model)
         w_bar.addWidget(self.cmb_model)
-        w_bar.addWidget(QLabel("  言語:"))
+        w_bar.addWidget(self.lbl_lang)
         w_bar.addWidget(self.cmb_lang)
         w_bar.addWidget(self.btn_transcribe)
         w_bar.addWidget(self.btn_transcribe_cancel)
@@ -649,7 +784,7 @@ class MainWindow(QMainWindow):
         w_bar.addStretch()
         vbox.addLayout(w_bar)
 
-        # ── スプリッター（SRTテーブル | ビデオプレーヤー） ──
+        # ── スプリッター ─────────────────────────────
         spl = QSplitter(Qt.Orientation.Horizontal)
 
         self.player = VideoPlayer()
@@ -663,14 +798,14 @@ class MainWindow(QMainWindow):
         vbox.addWidget(spl, stretch=1)
 
         # ── 出力設定 ──────────────────────────────────
-        grp = QGroupBox("出力設定")
-        gv  = QVBoxLayout(grp)
+        self.grp_output = QGroupBox(tr('output_group'))
+        gv = QVBoxLayout(self.grp_output)
 
         r1 = QHBoxLayout()
-        self.rb_combine  = QRadioButton("1ファイルに結合")
-        self.rb_separate = QRadioButton("行ごとに別ファイル")
+        self.rb_combine   = QRadioButton(tr('combine'))
+        self.rb_separate  = QRadioButton(tr('separate'))
         self.rb_combine.setChecked(True)
-        self.chk_reencode = QCheckBox("再エンコード (libx264/aac) — 遅いが正確")
+        self.chk_reencode = QCheckBox(tr('reencode'))
         r1.addWidget(self.rb_combine)
         r1.addWidget(self.rb_separate)
         r1.addSpacing(24)
@@ -679,19 +814,20 @@ class MainWindow(QMainWindow):
         gv.addLayout(r1)
 
         r2 = QHBoxLayout()
-        r2.addWidget(QLabel("出力先:"))
+        self.lbl_output_dir = QLabel(tr('output_dir'))
         self.txt_dir = QLineEdit(str(Path.home() / "Downloads"))
-        self.btn_dir = QPushButton("参照…")
+        self.btn_dir = QPushButton(tr('browse'))
         self.btn_dir.clicked.connect(self._browse_dir)
+        r2.addWidget(self.lbl_output_dir)
         r2.addWidget(self.txt_dir)
         r2.addWidget(self.btn_dir)
         gv.addLayout(r2)
-        vbox.addWidget(grp)
+        vbox.addWidget(self.grp_output)
 
         # ── 実行行 ────────────────────────────────────
         exec_row = QHBoxLayout()
-        self.btn_exec   = QPushButton("▶  ffmpegカット実行")
-        self.btn_cancel = QPushButton("キャンセル")
+        self.btn_exec   = QPushButton(tr('execute'))
+        self.btn_cancel = QPushButton(tr('cancel'))
         f = self.btn_exec.font()
         f.setPointSize(13)
         self.btn_exec.setFont(f)
@@ -710,20 +846,70 @@ class MainWindow(QMainWindow):
         self.log.setMaximumHeight(90)
         vbox.addWidget(self.log)
 
+    # ── 言語切り替え ──────────────────────────────────
+
+    def _toggle_lang(self):
+        global _lang
+        _lang = 'en' if _lang == 'ja' else 'ja'
+        self.retranslate()
+
+    def retranslate(self):
+        self.setWindowTitle(tr('window_title'))
+        self.btn_video.setText(tr('open_video'))
+        self.btn_srt.setText(tr('open_srt'))
+        self.btn_save_srt.setText(tr('save_srt'))
+        self.btn_save_srt.setToolTip(tr('save_srt_tip'))
+        self.btn_lang.setText(tr('lang_toggle'))
+        self.btn_donate.setText(tr('donate'))
+        self.btn_donate.setToolTip(tr('donate_tip'))
+        self.lbl_transcribe.setText(tr('transcribe_label'))
+        self.lbl_model.setText(tr('model_label'))
+        self.lbl_lang.setText(tr('lang_label'))
+        self.cmb_model.setToolTip(tr('model_tip'))
+        self.cmb_lang.setToolTip(tr('lang_tip'))
+        self.btn_transcribe.setText(tr('transcribe_btn'))
+        self.btn_transcribe_cancel.setText(tr('transcribe_cancel'))
+        self.chk_mark_silence.setText(tr('mark_silence'))
+        self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
+        self.spn_silence.setSuffix(tr('silence_suffix'))
+        self.spn_silence.setToolTip(tr('silence_tip'))
+        self.grp_output.setTitle(tr('output_group'))
+        self.rb_combine.setText(tr('combine'))
+        self.rb_separate.setText(tr('separate'))
+        self.chk_reencode.setText(tr('reencode'))
+        self.lbl_output_dir.setText(tr('output_dir'))
+        self.btn_dir.setText(tr('browse'))
+        self.btn_exec.setText(tr('execute'))
+        self.btn_cancel.setText(tr('cancel'))
+        # 動画・SRTラベルは現在のファイル名を保持
+        if self.video_path:
+            self.lbl_video.setText(tr('video_label').format(name=Path(self.video_path).name))
+        else:
+            self.lbl_video.setText(tr('video_none'))
+        if self.srt_path:
+            self.lbl_srt.setText(tr('srt_label').format(name=Path(self.srt_path).name))
+        else:
+            self.lbl_srt.setText(tr('srt_none'))
+        # サブウィジェット
+        self.player.retranslate()
+        self.srt_tbl.retranslate()
+        # メニュー再構築
+        self.menuBar().clear()
+        self._build_menu()
+
     # ── スロット ──────────────────────────────────────
 
     def _open_video(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "動画ファイルを選択",
+            self, tr('dlg_open_video'),
             str(Path.home() / "Downloads"),
-            "動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;すべて (*)")
+            tr('dlg_video_filter'))
         if not path:
             return
         self.video_path = path
-        self.lbl_video.setText(f"動画: {Path(path).name}")
+        self.lbl_video.setText(tr('video_label').format(name=Path(path).name))
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
-        # 同名 .srt を自動検出
         for ext in ('.srt', '.SRT'):
             candidate = Path(path).with_suffix(ext)
             if candidate.exists():
@@ -734,7 +920,7 @@ class MainWindow(QMainWindow):
         start = (str(Path(self.video_path).parent)
                  if self.video_path else str(Path.home()))
         path, _ = QFileDialog.getOpenFileName(
-            self, "SRTファイルを選択", start, "SRT (*.srt);;すべて (*)")
+            self, tr('dlg_open_srt'), start, tr('dlg_srt_filter'))
         if path:
             self._load_srt(path)
 
@@ -742,20 +928,20 @@ class MainWindow(QMainWindow):
         try:
             text = Path(path).read_text(encoding='utf-8-sig')
         except Exception as exc:
-            QMessageBox.critical(self, "エラー", f"SRT読み込みエラー:\n{exc}")
+            QMessageBox.critical(self, tr('err_title'), f"SRT error:\n{exc}")
             return
         entries = parse_srt(text)
         self.srt_tbl.load(entries)
         self.srt_path = path
-        self.lbl_srt.setText(f"SRT: {Path(path).name}")
+        self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
         self.btn_save_srt.setEnabled(True)
-        self.log.append(f"SRT読み込み完了: {len(entries)} セグメント — {path}")
+        self.log.append(tr('log_srt_loaded').format(n=len(entries), path=path))
 
     def _save_srt(self):
         path = self.srt_path
         if not path:
             path, _ = QFileDialog.getSaveFileName(
-                self, "SRTファイルを保存", str(Path.home()), "SRT (*.srt)")
+                self, tr('dlg_save_srt'), str(Path.home()), tr('dlg_srt_filter'))
             if not path:
                 return
             self.srt_path = path
@@ -770,11 +956,11 @@ class MainWindow(QMainWindow):
         try:
             Path(path).write_text('\n'.join(lines), encoding='utf-8')
         except Exception as exc:
-            QMessageBox.critical(self, "エラー", f"保存失敗:\n{exc}")
+            QMessageBox.critical(self, tr('err_title'), f"Save failed:\n{exc}")
             return
 
-        self.lbl_srt.setText(f"SRT: {Path(path).name}")
-        self.log.append(f"SRT保存: {path}")
+        self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
+        self.log.append(tr('log_srt_saved').format(path=path))
 
     def _on_row(self, row: int):
         if row < len(self.srt_tbl.entries):
@@ -782,18 +968,18 @@ class MainWindow(QMainWindow):
 
     def _browse_dir(self):
         d = QFileDialog.getExistingDirectory(
-            self, "出力先ディレクトリを選択", self.txt_dir.text())
+            self, tr('dlg_output_dir'), self.txt_dir.text())
         if d:
             self.txt_dir.setText(d)
 
     def _execute(self):
         if not self.video_path:
-            QMessageBox.warning(self, "エラー", "動画ファイルを開いてください")
+            QMessageBox.warning(self, tr('err_title'), tr('err_no_video'))
             return
         entries = self.srt_tbl.entries
         count = sum(1 for e in entries if e.checked)
         if count == 0:
-            QMessageBox.warning(self, "エラー", "1つ以上のセグメントを選択してください")
+            QMessageBox.warning(self, tr('err_title'), tr('err_no_segments'))
             return
 
         self.progress.setRange(0, count)
@@ -848,7 +1034,7 @@ class MainWindow(QMainWindow):
         self.btn_transcribe.setEnabled(False)
         self.btn_transcribe_cancel.setEnabled(True)
         self.btn_exec.setEnabled(False)
-        self.log.append(f"--- 文字起こし開始: {Path(self.video_path).name} ---")
+        self.log.append(tr('log_transcribe_start').format(name=Path(self.video_path).name))
         self.whisper_worker.start()
 
     def _cancel_transcribe(self):
@@ -861,11 +1047,11 @@ class MainWindow(QMainWindow):
         self.btn_transcribe_cancel.setEnabled(False)
         self.btn_exec.setEnabled(True)
         if ok:
-            self.log.append(f"--- 文字起こし完了 → {result} ---")
+            self.log.append(tr('log_transcribe_done').format(path=result))
             self._load_srt(result)
         else:
-            self.log.append(f"文字起こしエラー: {result}")
-            QMessageBox.warning(self, "Whisper エラー", result)
+            self.log.append(f"Whisper error: {result}")
+            QMessageBox.warning(self, "Whisper", result)
 
     def _cancel(self):
         if self.worker:
@@ -877,17 +1063,16 @@ class MainWindow(QMainWindow):
         self.progress.setVisible(False)
         self.log.append(msg)
         fn = QMessageBox.information if ok else QMessageBox.warning
-        fn(self, "完了" if ok else "エラー", msg)
+        fn(self, tr('done_title') if ok else tr('err_title'), msg)
 
     def _build_menu(self):
-        menubar = self.menuBar()
-        help_menu = menubar.addMenu("ヘルプ")
-        about_action = help_menu.addAction("このソフトウェアについて")
+        help_menu = self.menuBar().addMenu(tr('menu_help'))
+        about_action = help_menu.addAction(tr('menu_about'))
         about_action.triggered.connect(self._show_about)
 
     def _show_about(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("このソフトウェアについて")
+        dlg.setWindowTitle(tr('about_title'))
         dlg.setMinimumWidth(400)
         layout = QVBoxLayout(dlg)
         layout.setSpacing(12)
@@ -899,7 +1084,8 @@ class MainWindow(QMainWindow):
         info = QLabel(
             "<p style='text-align:center;'>"
             "Reiji Sasaki<br>"
-            "九州大学大学院 臨床心理学講座"
+            "九州大学大学院 臨床心理学講座<br>"
+            "Kyushu University, Clinical Psychology"
             "</p>"
         )
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -909,7 +1095,7 @@ class MainWindow(QMainWindow):
             "<p style='text-align:center;'>"
             "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
             "　｜　"
-            "<a href='https://donate.sasakireijiyagi.com/'>開発を支援する（寄付）</a>"
+            f"<a href='https://donate.sasakireijiyagi.com/'>{tr('about_donate_link')}</a>"
             "</p>"
         )
         links.setAlignment(Qt.AlignmentFlag.AlignCenter)
