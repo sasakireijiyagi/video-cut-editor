@@ -471,6 +471,282 @@ class WhisperWorker(QThread):
 
 
 # ──────────────────────────────────────────────────────────────────
+# Batch whisper worker
+# ──────────────────────────────────────────────────────────────────
+
+class BatchWhisperWorker(QThread):
+    file_started  = pyqtSignal(int, int, str)   # current, total, filename
+    file_done     = pyqtSignal(int, int, bool, str)  # current, total, ok, msg
+    log           = pyqtSignal(str)
+    all_done      = pyqtSignal(int, int)        # success_count, total
+
+    def __init__(self, files: List[str], model: str, language: str,
+                 mark_silence: bool, silence_sec: float):
+        super().__init__()
+        self.files        = files
+        self.model        = model
+        self.language     = language
+        self.mark_silence = mark_silence
+        self.silence_ms   = int(silence_sec * 1000)
+        self._stop        = False
+        self._proc        = None
+
+    def cancel(self):
+        self._stop = True
+        if self._proc:
+            self._proc.terminate()
+
+    def run(self):
+        total   = len(self.files)
+        success = 0
+        env     = os.environ.copy()
+        env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+
+        for i, video in enumerate(self.files):
+            if self._stop:
+                break
+
+            self.file_started.emit(i + 1, total, Path(video).name)
+
+            outdir = str(Path(video).parent)
+            cmd = [WHISPER_BIN, video,
+                   '--model', self.model,
+                   '--output_format', 'srt',
+                   '--output_dir', outdir]
+            if self.language != 'auto':
+                cmd += ['--language', self.language]
+
+            try:
+                self._proc = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, env=env)
+                for line in self._proc.stdout:
+                    line = line.rstrip()
+                    if line:
+                        self.log.emit(line)
+                self._proc.wait()
+            except Exception as exc:
+                self.file_done.emit(i + 1, total, False, str(exc))
+                continue
+
+            if self._proc.returncode != 0:
+                self.file_done.emit(i + 1, total, False,
+                    f"whisper error (code {self._proc.returncode})")
+                continue
+
+            # SRTを探す
+            stem = Path(video).stem
+            srt  = Path(outdir) / (stem + '.srt')
+            if not srt.exists():
+                hits = sorted(Path(outdir).glob('*.srt'),
+                              key=lambda p: p.stat().st_mtime, reverse=True)
+                srt  = hits[0] if hits else srt
+
+            if not srt.exists():
+                self.file_done.emit(i + 1, total, False, f"SRT not found: {srt}")
+                continue
+
+            # [間] 挿入
+            if self.mark_silence:
+                entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
+                new_entries = []
+                for j, entry in enumerate(entries):
+                    new_entries.append(entry)
+                    if j + 1 < len(entries):
+                        gap_ms = entries[j + 1].start_ms - entry.end_ms
+                        if gap_ms >= self.silence_ms:
+                            label = (f'[Pause  {gap_ms/1000:.1f}s]'
+                                     if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]')
+                            new_entries.append(SRTEntry(0, entry.end_ms,
+                                entries[j + 1].start_ms, label))
+                for idx, e in enumerate(new_entries):
+                    e.index = idx + 1
+                lines = []
+                for e in new_entries:
+                    lines.append(str(e.index))
+                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                    lines.append(e.text)
+                    lines.append('')
+                srt.write_text('\n'.join(lines), encoding='utf-8')
+
+            success += 1
+            self.file_done.emit(i + 1, total, True, str(srt))
+
+        self.all_done.emit(success, total)
+
+
+# ──────────────────────────────────────────────────────────────────
+# Batch dialog
+# ──────────────────────────────────────────────────────────────────
+
+class BatchDialog(QDialog):
+    def __init__(self, parent=None, model: str = 'large-v3',
+                 language: str = '日本語',
+                 mark_silence: bool = False, silence_sec: float = 1.0):
+        super().__init__(parent)
+        self.setWindowTitle('バッチ文字起こし' if _lang == 'ja' else 'Batch Transcription')
+        self.setMinimumSize(700, 500)
+        self._worker: Optional[BatchWhisperWorker] = None
+        self._default_model    = model
+        self._default_language = language
+        self._default_silence  = mark_silence
+        self._default_silence_sec = silence_sec
+        self._build()
+
+    def _build(self):
+        vbox = QVBoxLayout(self)
+
+        # ── ファイルリスト ──
+        lbl = QLabel('動画ファイル一覧:' if _lang == 'ja' else 'Video files:')
+        vbox.addWidget(lbl)
+
+        self.file_list = QListWidget()
+        self.file_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection)
+        vbox.addWidget(self.file_list)
+
+        btn_row = QHBoxLayout()
+        btn_add    = QPushButton('追加…' if _lang == 'ja' else 'Add…')
+        btn_remove = QPushButton('削除' if _lang == 'ja' else 'Remove')
+        btn_clear  = QPushButton('全クリア' if _lang == 'ja' else 'Clear All')
+        btn_add.clicked.connect(self._add_files)
+        btn_remove.clicked.connect(self._remove_selected)
+        btn_clear.clicked.connect(self.file_list.clear)
+        btn_row.addWidget(btn_add)
+        btn_row.addWidget(btn_remove)
+        btn_row.addWidget(btn_clear)
+        btn_row.addStretch()
+        vbox.addLayout(btn_row)
+
+        # ── 設定 ──
+        cfg = QHBoxLayout()
+        cfg.addWidget(QLabel('モデル:' if _lang == 'ja' else 'Model:'))
+        self.cmb_model = QComboBox()
+        cache_dir = Path.home() / '.cache' / 'whisper'
+        cached = {p.stem for p in cache_dir.glob('*.pt')} if cache_dir.is_dir() else set()
+        for m in ['large-v3','large-v3-turbo','turbo','medium','small','base','tiny']:
+            self.cmb_model.addItem(f'★ {m}' if m in cached else m)
+        # デフォルトモデルを選択
+        stem = self._default_model
+        for i in range(self.cmb_model.count()):
+            if stem in self.cmb_model.itemText(i):
+                self.cmb_model.setCurrentIndex(i)
+                break
+        cfg.addWidget(self.cmb_model)
+        cfg.addSpacing(12)
+        cfg.addWidget(QLabel('言語:' if _lang == 'ja' else 'Language:'))
+        self.cmb_lang = QComboBox()
+        self.cmb_lang.addItems(list(_LANG_MAP.keys()))
+        self.cmb_lang.setCurrentText(self._default_language)
+        cfg.addWidget(self.cmb_lang)
+        cfg.addSpacing(12)
+        self.chk_silence = QCheckBox('[間]を記録' if _lang == 'ja' else 'Record [Pause]')
+        self.chk_silence.setChecked(self._default_silence)
+        self.spn_silence = QDoubleSpinBox()
+        self.spn_silence.setRange(0.5, 10.0)
+        self.spn_silence.setSingleStep(0.5)
+        self.spn_silence.setValue(self._default_silence_sec)
+        self.spn_silence.setSuffix(' 秒以上' if _lang == 'ja' else ' sec+')
+        cfg.addWidget(self.chk_silence)
+        cfg.addWidget(self.spn_silence)
+        cfg.addStretch()
+        vbox.addLayout(cfg)
+
+        # ── 進捗 ──
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        vbox.addWidget(self.progress)
+
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setMaximumHeight(140)
+        vbox.addWidget(self.log)
+
+        # ── 実行ボタン ──
+        exec_row = QHBoxLayout()
+        self.btn_start  = QPushButton('▶ 実行' if _lang == 'ja' else '▶ Start')
+        self.btn_cancel = QPushButton('中止' if _lang == 'ja' else 'Stop')
+        self.btn_cancel.setEnabled(False)
+        f = self.btn_start.font()
+        f.setPointSize(13)
+        self.btn_start.setFont(f)
+        self.btn_start.clicked.connect(self._start)
+        self.btn_cancel.clicked.connect(self._cancel)
+        exec_row.addWidget(self.btn_start)
+        exec_row.addWidget(self.btn_cancel)
+        exec_row.addStretch()
+        vbox.addLayout(exec_row)
+
+    def _add_files(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            '動画ファイルを選択' if _lang == 'ja' else 'Select video files',
+            str(Path.home() / 'Downloads'),
+            '動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;すべて (*)' if _lang == 'ja'
+            else 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;All (*)')
+        for p in paths:
+            # 重複チェック
+            items = [self.file_list.item(i).text()
+                     for i in range(self.file_list.count())]
+            if p not in items:
+                self.file_list.addItem(p)
+
+    def _remove_selected(self):
+        for item in self.file_list.selectedItems():
+            self.file_list.takeItem(self.file_list.row(item))
+
+    def _start(self):
+        files = [self.file_list.item(i).text()
+                 for i in range(self.file_list.count())]
+        if not files:
+            QMessageBox.warning(self,
+                'エラー' if _lang == 'ja' else 'Error',
+                'ファイルを追加してください' if _lang == 'ja' else 'Please add files.')
+            return
+
+        model = self.cmb_model.currentText().lstrip('★ ')
+        lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
+
+        self._worker = BatchWhisperWorker(
+            files, model, lang,
+            self.chk_silence.isChecked(),
+            self.spn_silence.value())
+        self._worker.file_started.connect(self._on_file_started)
+        self._worker.file_done.connect(self._on_file_done)
+        self._worker.log.connect(self.log.append)
+        self._worker.all_done.connect(self._on_all_done)
+
+        self.progress.setRange(0, len(files))
+        self.progress.setValue(0)
+        self.progress.setVisible(True)
+        self.btn_start.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self._worker.start()
+
+    def _cancel(self):
+        if self._worker:
+            self._worker.cancel()
+        self.btn_cancel.setEnabled(False)
+
+    def _on_file_started(self, current: int, total: int, name: str):
+        self.log.append(f"\n[{current}/{total}] {name}")
+
+    def _on_file_done(self, current: int, total: int, ok: bool, msg: str):
+        self.progress.setValue(current)
+        status = '✓' if ok else '✗'
+        self.log.append(f"  {status} {msg}")
+
+    def _on_all_done(self, success: int, total: int):
+        self.btn_start.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        msg = (f"完了: {success}/{total} ファイル処理しました"
+               if _lang == 'ja' else f"Done: {success}/{total} files processed.")
+        self.log.append(f"\n{'='*40}\n{msg}")
+        QMessageBox.information(self,
+            '完了' if _lang == 'ja' else 'Done', msg)
+
+
+# ──────────────────────────────────────────────────────────────────
 # SRT table widget
 # ──────────────────────────────────────────────────────────────────
 
@@ -759,6 +1035,11 @@ class MainWindow(QMainWindow):
         self.btn_transcribe_cancel.setEnabled(False)
         self.btn_transcribe_cancel.clicked.connect(self._cancel_transcribe)
 
+        self.btn_batch = QPushButton('📂 バッチ文字起こし' if _lang == 'ja' else '📂 Batch Transcription')
+        self.btn_batch.setToolTip('複数の動画ファイルをまとめて文字起こしする' if _lang == 'ja'
+                                  else 'Transcribe multiple video files at once')
+        self.btn_batch.clicked.connect(self._open_batch)
+
         self.chk_mark_silence = QCheckBox(tr('mark_silence'))
         self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
 
@@ -777,6 +1058,8 @@ class MainWindow(QMainWindow):
         w_bar.addWidget(self.cmb_lang)
         w_bar.addWidget(self.btn_transcribe)
         w_bar.addWidget(self.btn_transcribe_cancel)
+        w_bar.addSpacing(8)
+        w_bar.addWidget(self.btn_batch)
         w_bar.addSpacing(16)
         w_bar.addWidget(self.chk_mark_silence)
         w_bar.addWidget(self.spn_silence)
@@ -847,6 +1130,16 @@ class MainWindow(QMainWindow):
 
     # ── 言語切り替え ──────────────────────────────────
 
+    def _open_batch(self):
+        dlg = BatchDialog(
+            self,
+            model=self.cmb_model.currentText().lstrip('★ '),
+            language=self.cmb_lang.currentText(),
+            mark_silence=self.chk_mark_silence.isChecked(),
+            silence_sec=self.spn_silence.value(),
+        )
+        dlg.exec()
+
     def _open_donate(self):
         import urllib.parse as up
         if _lang == 'en':
@@ -891,6 +1184,7 @@ class MainWindow(QMainWindow):
         self.cmb_lang.setToolTip(tr('lang_tip'))
         self.btn_transcribe.setText(tr('transcribe_btn'))
         self.btn_transcribe_cancel.setText(tr('transcribe_cancel'))
+        self.btn_batch.setText('📂 バッチ文字起こし' if _lang == 'ja' else '📂 Batch Transcription')
         self.chk_mark_silence.setText(tr('mark_silence'))
         self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
         self.spn_silence.setSuffix(tr('silence_suffix'))
