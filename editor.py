@@ -804,13 +804,18 @@ class FillerCutDialog(QDialog):
         btn_row.addStretch()
         vbox.addLayout(btn_row)
 
+    @staticmethod
+    def _normalize(text: str) -> str:
+        """句読点・空白を除去して比較用テキストを返す"""
+        return text.strip().rstrip('、。，．,. \t　')
+
     def _apply(self):
         fillers = {line.strip() for line in
                    self.txt_fillers.toPlainText().splitlines() if line.strip()}
         count = 0
         self.srt_table.tbl.blockSignals(True)
         for row, entry in enumerate(self.srt_table.entries):
-            if entry.text.strip() in fillers:
+            if self._normalize(entry.text) in fillers:
                 entry.checked = False
                 item = self.srt_table.tbl.item(row, 0)
                 if item:
