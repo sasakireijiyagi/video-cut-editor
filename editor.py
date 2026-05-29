@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QMenuBar,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -747,6 +748,199 @@ class BatchDialog(QDialog):
 
 
 # ──────────────────────────────────────────────────────────────────
+# Find & Replace dialog
+# ──────────────────────────────────────────────────────────────────
+
+class FindReplaceDialog(QDialog):
+    def __init__(self, srt_table, parent=None):
+        super().__init__(parent)
+        self.srt_table   = srt_table
+        self._matches: List[int] = []  # マッチした行インデックス
+        self._match_idx  = -1
+        self.setWindowTitle('検索と置換' if _lang == 'ja' else 'Find & Replace')
+        self.setMinimumWidth(420)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self._build()
+
+    def _build(self):
+        grid = QVBoxLayout(self)
+
+        # 検索
+        r1 = QHBoxLayout()
+        r1.addWidget(QLabel('検索:' if _lang == 'ja' else 'Find:'))
+        self.txt_find = QLineEdit()
+        self.txt_find.setPlaceholderText('検索するテキスト' if _lang == 'ja' else 'Search text')
+        self.txt_find.textChanged.connect(self._on_find_changed)
+        r1.addWidget(self.txt_find)
+        grid.addLayout(r1)
+
+        # 置換
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel('置換:' if _lang == 'ja' else 'Replace:'))
+        self.txt_replace = QLineEdit()
+        self.txt_replace.setPlaceholderText('置換後のテキスト' if _lang == 'ja' else 'Replacement text')
+        r2.addWidget(self.txt_replace)
+        grid.addLayout(r2)
+
+        # オプション
+        opt = QHBoxLayout()
+        self.chk_case = QCheckBox('大文字小文字を区別' if _lang == 'ja' else 'Case sensitive')
+        self.lbl_status = QLabel('')
+        self.lbl_status.setStyleSheet('color: #555;')
+        opt.addWidget(self.chk_case)
+        opt.addStretch()
+        opt.addWidget(self.lbl_status)
+        grid.addLayout(opt)
+
+        # ボタン
+        btn_row = QHBoxLayout()
+        self.btn_prev    = QPushButton('◀ 前へ' if _lang == 'ja' else '◀ Prev')
+        self.btn_next    = QPushButton('次へ ▶' if _lang == 'ja' else 'Next ▶')
+        self.btn_replace = QPushButton('置換' if _lang == 'ja' else 'Replace')
+        self.btn_all     = QPushButton('一括置換' if _lang == 'ja' else 'Replace All')
+        self.btn_prev.clicked.connect(self._prev)
+        self.btn_next.clicked.connect(self._next)
+        self.btn_replace.clicked.connect(self._replace_one)
+        self.btn_all.clicked.connect(self._replace_all)
+        for b in (self.btn_prev, self.btn_next, self.btn_replace, self.btn_all):
+            btn_row.addWidget(b)
+        btn_row.addStretch()
+        grid.addLayout(btn_row)
+
+    # ── ロジック ──────────────────────────────────
+
+    def _search_text(self) -> str:
+        return self.txt_find.text()
+
+    def _find_matches(self) -> List[int]:
+        needle = self._search_text()
+        if not needle:
+            return []
+        case = Qt.CaseSensitivity.CaseSensitive if self.chk_case.isChecked() \
+               else Qt.CaseSensitivity.CaseInsensitive
+        result = []
+        for i, entry in enumerate(self.srt_table.entries):
+            haystack = entry.text if self.chk_case.isChecked() else entry.text.lower()
+            n        = needle if self.chk_case.isChecked() else needle.lower()
+            if n in haystack:
+                result.append(i)
+        return result
+
+    def _on_find_changed(self):
+        self._matches  = self._find_matches()
+        self._match_idx = 0 if self._matches else -1
+        self._update_status()
+        self._highlight()
+
+    def _update_status(self):
+        if not self._search_text():
+            self.lbl_status.setText('')
+        elif not self._matches:
+            self.lbl_status.setText('見つかりません' if _lang == 'ja' else 'No matches')
+            self.lbl_status.setStyleSheet('color: red;')
+        else:
+            pos = self._match_idx + 1 if self._match_idx >= 0 else '?'
+            self.lbl_status.setText(f'{pos} / {len(self._matches)}件')
+            self.lbl_status.setStyleSheet('color: #555;')
+
+    def _highlight(self):
+        tbl = self.srt_table.tbl
+        # 全行のハイライトをリセット
+        for row in range(tbl.rowCount()):
+            for col in range(tbl.columnCount()):
+                item = tbl.item(row, col)
+                if item:
+                    item.setBackground(Qt.GlobalColor.transparent)
+        # マッチ行をハイライト
+        for row in self._matches:
+            for col in range(tbl.columnCount()):
+                item = tbl.item(row, col)
+                if item:
+                    item.setBackground(Qt.GlobalColor.yellow)
+        # 現在のマッチを強調
+        if self._matches and self._match_idx >= 0:
+            cur_row = self._matches[self._match_idx]
+            tbl.scrollToItem(tbl.item(cur_row, 3))
+            tbl.selectRow(cur_row)
+
+    def _next(self):
+        if not self._matches:
+            self._matches = self._find_matches()
+        if not self._matches:
+            return
+        self._match_idx = (self._match_idx + 1) % len(self._matches)
+        self._update_status()
+        self._highlight()
+
+    def _prev(self):
+        if not self._matches:
+            self._matches = self._find_matches()
+        if not self._matches:
+            return
+        self._match_idx = (self._match_idx - 1) % len(self._matches)
+        self._update_status()
+        self._highlight()
+
+    def _replace_one(self):
+        if not self._matches or self._match_idx < 0:
+            return
+        row   = self._matches[self._match_idx]
+        entry = self.srt_table.entries[row]
+        needle  = self._search_text()
+        replace = self.txt_replace.text()
+        if self.chk_case.isChecked():
+            entry.text = entry.text.replace(needle, replace)
+        else:
+            import re as _re
+            entry.text = _re.sub(_re.escape(needle), replace, entry.text,
+                                  flags=_re.IGNORECASE)
+        # テーブル表示を更新
+        self.srt_table.tbl.blockSignals(True)
+        item = self.srt_table.tbl.item(row, 3)
+        if item:
+            item.setText(entry.text.replace('\n', ' '))
+        self.srt_table.tbl.blockSignals(False)
+        # 再検索
+        self._on_find_changed()
+
+    def _replace_all(self):
+        needle  = self._search_text()
+        replace = self.txt_replace.text()
+        if not needle:
+            return
+        count = 0
+        import re as _re
+        self.srt_table.tbl.blockSignals(True)
+        for i, entry in enumerate(self.srt_table.entries):
+            if self.chk_case.isChecked():
+                if needle in entry.text:
+                    entry.text = entry.text.replace(needle, replace)
+                    count += 1
+            else:
+                new_text = _re.sub(_re.escape(needle), replace, entry.text,
+                                   flags=_re.IGNORECASE)
+                if new_text != entry.text:
+                    entry.text = new_text
+                    count += 1
+            item = self.srt_table.tbl.item(i, 3)
+            if item:
+                item.setText(entry.text.replace('\n', ' '))
+        self.srt_table.tbl.blockSignals(False)
+        msg = f'{count} 件置換しました' if _lang == 'ja' else f'Replaced {count} item(s).'
+        self.lbl_status.setText(msg)
+        self.lbl_status.setStyleSheet('color: green;')
+        self._matches = []
+        self._match_idx = -1
+        self._highlight()
+
+    def closeEvent(self, event):
+        # ダイアログを閉じたらハイライトをクリア
+        self._matches = []
+        self._highlight()
+        super().closeEvent(event)
+
+
+# ──────────────────────────────────────────────────────────────────
 # SRT table widget
 # ──────────────────────────────────────────────────────────────────
 
@@ -765,11 +959,14 @@ class SRTTable(QWidget):
         bar = QHBoxLayout()
         self.btn_all  = QPushButton(tr('select_all'))
         self.btn_none = QPushButton(tr('deselect_all'))
+        self.btn_find = QPushButton('🔍 検索・置換' if _lang == 'ja' else '🔍 Find & Replace')
         self.lbl_count = QLabel("")
         self.btn_all.clicked.connect(self._all)
         self.btn_none.clicked.connect(self._none)
+        self.btn_find.clicked.connect(self._open_find_replace)
         bar.addWidget(self.btn_all)
         bar.addWidget(self.btn_none)
+        bar.addWidget(self.btn_find)
         bar.addStretch()
         bar.addWidget(self.lbl_count)
         vbox.addLayout(bar)
@@ -791,8 +988,13 @@ class SRTTable(QWidget):
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
         self.btn_none.setText(tr('deselect_all'))
+        self.btn_find.setText('🔍 検索・置換' if _lang == 'ja' else '🔍 Find & Replace')
         self.tbl.setHorizontalHeaderLabels(tr('tbl_headers'))
         self._update_count()
+
+    def _open_find_replace(self):
+        dlg = FindReplaceDialog(self, self.window())
+        dlg.show()
 
     def load(self, entries: List[SRTEntry]):
         self.entries = entries
@@ -974,6 +1176,8 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1100, 700)
         self._build()
         self._build_menu()
+        QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
+            self.srt_tbl._open_find_replace)
 
     def _build(self):
         root = QWidget()
