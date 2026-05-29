@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QMenuBar,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -592,9 +593,17 @@ class MainWindow(QMainWindow):
         self.btn_video.clicked.connect(self._open_video)
         self.btn_srt.clicked.connect(self._open_srt)
         self.btn_save_srt.clicked.connect(self._save_srt)
+        btn_donate = QPushButton("❤ 開発を支援する")
+        btn_donate.setStyleSheet("color: #c0392b; font-size: 11px;")
+        btn_donate.setFlat(True)
+        btn_donate.setToolTip("寄付ページを開きます")
+        btn_donate.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://donate.sasakireijiyagi.com/")))
+
         for w in (self.btn_video, self.lbl_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
             bar.addWidget(w)
         bar.addStretch()
+        bar.addWidget(btn_donate)
         vbox.addLayout(bar)
 
         # ── Whisper 文字起こし行 ──────────────────────
