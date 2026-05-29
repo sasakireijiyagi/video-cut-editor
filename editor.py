@@ -1223,7 +1223,11 @@ class MainWindow(QMainWindow):
         if not path:
             return
         self.video_path = path
+        self.srt_path   = None
         self.lbl_video.setText(tr('video_label').format(name=Path(path).name))
+        self.lbl_srt.setText(tr('srt_none'))
+        self.srt_tbl.load([])
+        self.btn_save_srt.setEnabled(False)
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
         for ext in ('.srt', '.SRT'):
