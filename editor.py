@@ -272,6 +272,19 @@ def _find_whisper() -> str:
 FFMPEG_BIN  = _find_ffmpeg()
 WHISPER_BIN = _find_whisper()
 
+DEFAULT_FILLERS = [
+    'えー', 'えーと', 'えっと', 'えと',
+    'あー', 'あーと', 'あの', 'あのー', 'あのう',
+    'うーん', 'うん', 'うーむ',
+    'まあ', 'まー',
+    'そのー', 'その',
+    'なんか', 'なんかー',
+    'ね', 'ねー', 'ねえ',
+    'さー', 'さあ',
+    'はい', 'はー',
+    'んー', 'んーと',
+]
+
 _LANG_MAP = {
     '日本語': 'ja',
     'English': 'en',
@@ -751,6 +764,65 @@ class BatchDialog(QDialog):
 # Find & Replace dialog
 # ──────────────────────────────────────────────────────────────────
 
+class FillerCutDialog(QDialog):
+    def __init__(self, srt_table, parent=None):
+        super().__init__(parent)
+        self.srt_table = srt_table
+        self.setWindowTitle('フィラーカット' if _lang == 'ja' else 'Filler Cut')
+        self.setMinimumWidth(380)
+        self._build()
+
+    def _build(self):
+        vbox = QVBoxLayout(self)
+
+        lbl = QLabel(
+            '以下のテキストと完全一致するセグメントのチェックを外します。\n'
+            '1行1ワード。編集可能です。'
+            if _lang == 'ja' else
+            'Uncheck segments that exactly match the words below.\n'
+            'One word per line. Editable.'
+        )
+        lbl.setWordWrap(True)
+        vbox.addWidget(lbl)
+
+        self.txt_fillers = QTextEdit()
+        self.txt_fillers.setPlainText('\n'.join(DEFAULT_FILLERS))
+        self.txt_fillers.setMaximumHeight(200)
+        vbox.addWidget(self.txt_fillers)
+
+        self.lbl_result = QLabel('')
+        self.lbl_result.setStyleSheet('color: green;')
+        vbox.addWidget(self.lbl_result)
+
+        btn_row = QHBoxLayout()
+        btn_apply = QPushButton('適用' if _lang == 'ja' else 'Apply')
+        btn_close = QPushButton('閉じる' if _lang == 'ja' else 'Close')
+        btn_apply.clicked.connect(self._apply)
+        btn_close.clicked.connect(self.close)
+        btn_row.addWidget(btn_apply)
+        btn_row.addWidget(btn_close)
+        btn_row.addStretch()
+        vbox.addLayout(btn_row)
+
+    def _apply(self):
+        fillers = {line.strip() for line in
+                   self.txt_fillers.toPlainText().splitlines() if line.strip()}
+        count = 0
+        self.srt_table.tbl.blockSignals(True)
+        for row, entry in enumerate(self.srt_table.entries):
+            if entry.text.strip() in fillers:
+                entry.checked = False
+                item = self.srt_table.tbl.item(row, 0)
+                if item:
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                count += 1
+        self.srt_table.tbl.blockSignals(False)
+        self.srt_table._update_count()
+        msg = f'{count} 件のフィラーを解除しました' if _lang == 'ja' \
+              else f'{count} filler(s) unchecked.'
+        self.lbl_result.setText(msg)
+
+
 class FindReplaceDialog(QDialog):
     def __init__(self, srt_table, parent=None):
         super().__init__(parent)
@@ -959,14 +1031,17 @@ class SRTTable(QWidget):
         bar = QHBoxLayout()
         self.btn_all  = QPushButton(tr('select_all'))
         self.btn_none = QPushButton(tr('deselect_all'))
-        self.btn_find = QPushButton('🔍 検索・置換' if _lang == 'ja' else '🔍 Find & Replace')
-        self.lbl_count = QLabel("")
+        self.btn_find   = QPushButton('🔍 検索・置換' if _lang == 'ja' else '🔍 Find & Replace')
+        self.btn_filler = QPushButton('✂ フィラーカット' if _lang == 'ja' else '✂ Filler Cut')
+        self.lbl_count  = QLabel("")
         self.btn_all.clicked.connect(self._all)
         self.btn_none.clicked.connect(self._none)
         self.btn_find.clicked.connect(self._open_find_replace)
+        self.btn_filler.clicked.connect(self._open_filler_cut)
         bar.addWidget(self.btn_all)
         bar.addWidget(self.btn_none)
         bar.addWidget(self.btn_find)
+        bar.addWidget(self.btn_filler)
         bar.addStretch()
         bar.addWidget(self.lbl_count)
         vbox.addLayout(bar)
@@ -989,12 +1064,17 @@ class SRTTable(QWidget):
         self.btn_all.setText(tr('select_all'))
         self.btn_none.setText(tr('deselect_all'))
         self.btn_find.setText('🔍 検索・置換' if _lang == 'ja' else '🔍 Find & Replace')
+        self.btn_filler.setText('✂ フィラーカット' if _lang == 'ja' else '✂ Filler Cut')
         self.tbl.setHorizontalHeaderLabels(tr('tbl_headers'))
         self._update_count()
 
     def _open_find_replace(self):
         dlg = FindReplaceDialog(self, self.window())
         dlg.show()
+
+    def _open_filler_cut(self):
+        dlg = FillerCutDialog(self, self.window())
+        dlg.exec()
 
     def load(self, entries: List[SRTEntry]):
         self.entries = entries
