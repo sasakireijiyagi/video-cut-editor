@@ -40,6 +40,7 @@ from PyQt6.QtWidgets import (
     QLabel, QFileDialog, QLineEdit, QRadioButton, QGroupBox,
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
     QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox,
+    QDialog, QDialogButtonBox, QMenuBar,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -569,9 +570,10 @@ class MainWindow(QMainWindow):
         self.srt_path:   Optional[str] = None
         self.worker: Optional[FFmpegWorker] = None
         self.whisper_worker: Optional[WhisperWorker] = None
-        self.setWindowTitle("Video Cut Editor")
+        self.setWindowTitle("Video Cut Editor  —  by Reiji Sasaki")
         self.setMinimumSize(1100, 700)
         self._build()
+        self._build_menu()
 
     def _build(self):
         root = QWidget()
@@ -867,6 +869,49 @@ class MainWindow(QMainWindow):
         self.log.append(msg)
         fn = QMessageBox.information if ok else QMessageBox.warning
         fn(self, "完了" if ok else "エラー", msg)
+
+    def _build_menu(self):
+        menubar = self.menuBar()
+        help_menu = menubar.addMenu("ヘルプ")
+        about_action = help_menu.addAction("このソフトウェアについて")
+        about_action.triggered.connect(self._show_about)
+
+    def _show_about(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("このソフトウェアについて")
+        dlg.setMinimumWidth(400)
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(12)
+
+        title = QLabel("<h2>Video Cut Editor</h2>")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+
+        info = QLabel(
+            "<p style='text-align:center;'>"
+            "Reiji Sasaki<br>"
+            "九州大学大学院 臨床心理学講座"
+            "</p>"
+        )
+        info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(info)
+
+        links = QLabel(
+            "<p style='text-align:center;'>"
+            "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
+            "　｜　"
+            "<a href='https://donate.sasakireijiyagi.com/'>開発を支援する（寄付）</a>"
+            "</p>"
+        )
+        links.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        links.setOpenExternalLinks(True)
+        layout.addWidget(links)
+
+        btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        btn.accepted.connect(dlg.accept)
+        layout.addWidget(btn)
+
+        dlg.exec()
 
 
 # ──────────────────────────────────────────────────────────────────
