@@ -1,22 +1,18 @@
 # Video Cut Editor
 
-動画の文字起こし・不要部分のカット・字幕用SRTファイルの編集ができる、Mac専用のローカルツールです。  
-完全ローカル動作・無料・サービス終了なし。
+動画の文字起こし・不要部分のカット・字幕用SRTファイルの編集ができるローカルツールです。  
+完全ローカル動作・無料・サービス終了なし。Mac / Windows 対応。
 
 ---
 
-## 必要なもの
+## 必要なもの（共通）
 
-- Mac（Apple Silicon / Intel どちらでも可）
 - インターネット接続（初回セットアップ時のみ）
 - [Anaconda](https://www.anaconda.com/download) または [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 
-> **Anacondaをまだ持っていない場合**  
-> https://www.anaconda.com/download からインストールしてください。
-
 ---
 
-## セットアップ（初回のみ）
+## セットアップ — Mac
 
 配布フォルダの中にある **「セットアップ.command」をダブルクリック**してください。
 
@@ -32,7 +28,40 @@
 
 ---
 
-## 起動方法
+## セットアップ — Windows
+
+### 1. ffmpeg をインストール
+
+[ffmpeg 公式サイト](https://ffmpeg.org/download.html) からビルド済みバイナリをダウンロードし、`C:\ffmpeg` に展開します。  
+その後、システム環境変数の `PATH` に `C:\ffmpeg\bin` を追加してください。
+
+> **確認方法：** コマンドプロンプトで `ffmpeg -version` と入力してバージョンが表示されればOKです。
+
+### 2. whisper をインストール
+
+Anaconda Prompt（またはコマンドプロンプト）で以下を実行してください：
+
+```bat
+pip install openai-whisper
+```
+
+### 3. PyQt6 をインストール
+
+```bat
+pip install PyQt6
+```
+
+### 4. 起動
+
+```bat
+python editor.py
+```
+
+> **注意：** Windowsでは `.app` ファイルは使用できません。`editor.py` を直接実行してください。
+
+---
+
+## 起動方法 — Mac
 
 セットアップ完了後は **`VideoCutEditor.app` をダブルクリック**するだけです。  
 Dock に追加しておくと便利です。

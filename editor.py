@@ -10,13 +10,22 @@ import shutil
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
 def _find_pyqt6_plugins() -> str:
     import glob
-    patterns = [
-        '/opt/anaconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins',
-        '/opt/miniconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins',
-        os.path.expanduser('~/anaconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
-        os.path.expanduser('~/miniconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
-        os.path.expanduser('~/miniforge3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
-    ]
+    if sys.platform == 'win32':
+        patterns = [
+            os.path.expanduser('~/anaconda3/Lib/site-packages/PyQt6/Qt6/plugins'),
+            os.path.expanduser('~/miniconda3/Lib/site-packages/PyQt6/Qt6/plugins'),
+            os.path.expanduser('~/miniforge3/Lib/site-packages/PyQt6/Qt6/plugins'),
+            r'C:\ProgramData\anaconda3\Lib\site-packages\PyQt6\Qt6\plugins',
+            r'C:\ProgramData\miniconda3\Lib\site-packages\PyQt6\Qt6\plugins',
+        ]
+    else:
+        patterns = [
+            '/opt/anaconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins',
+            '/opt/miniconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins',
+            os.path.expanduser('~/anaconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
+            os.path.expanduser('~/miniconda3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
+            os.path.expanduser('~/miniforge3/lib/python3.*/site-packages/PyQt6/Qt6/plugins'),
+        ]
     for pat in patterns:
         hits = sorted(glob.glob(pat))
         if hits:
@@ -247,26 +256,63 @@ def parse_srt(text: str) -> List[SRTEntry]:
 # ──────────────────────────────────────────────────────────────────
 
 def _find_ffmpeg() -> str:
-    for p in ['/usr/local/bin/ffmpeg', '/opt/homebrew/bin/ffmpeg']:
+    # まず PATH から探す
+    w = shutil.which('ffmpeg')
+    if w:
+        return w
+    if sys.platform == 'win32':
+        candidates = [
+            r'C:\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files\ffmpeg\bin\ffmpeg.exe',
+            r'C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe',
+            os.path.expanduser(r'~\ffmpeg\bin\ffmpeg.exe'),
+        ]
+    else:
+        candidates = [
+            '/usr/local/bin/ffmpeg',
+            '/opt/homebrew/bin/ffmpeg',
+        ]
+    for p in candidates:
         if os.path.isfile(p):
             return p
-    return shutil.which('ffmpeg') or 'ffmpeg'
+    return 'ffmpeg'
 
 def _find_whisper() -> str:
     w = shutil.which('whisper')
     if w:
         return w
-    for base in ['/opt/anaconda3', '/opt/miniconda3',
-                 os.path.expanduser('~/anaconda3'),
-                 os.path.expanduser('~/miniconda3'),
-                 os.path.expanduser('~/miniforge3'),
-                 os.path.expanduser('~/mambaforge')]:
-        hits = sorted(Path(base).glob('envs/*/bin/whisper'))
-        if hits:
-            return str(hits[0])
-        w_base = Path(base) / 'bin' / 'whisper'
-        if w_base.exists():
-            return str(w_base)
+    if sys.platform == 'win32':
+        # Windows conda: Scripts/whisper.exe
+        conda_bases = [
+            os.path.expanduser('~/anaconda3'),
+            os.path.expanduser('~/miniconda3'),
+            os.path.expanduser('~/miniforge3'),
+            r'C:\ProgramData\anaconda3',
+            r'C:\ProgramData\miniconda3',
+        ]
+        for base in conda_bases:
+            # envs 内を検索
+            hits = sorted(Path(base).glob('envs/*/Scripts/whisper.exe'))
+            if hits:
+                return str(hits[0])
+            w_base = Path(base) / 'Scripts' / 'whisper.exe'
+            if w_base.exists():
+                return str(w_base)
+    else:
+        conda_bases = [
+            '/opt/anaconda3', '/opt/miniconda3',
+            os.path.expanduser('~/anaconda3'),
+            os.path.expanduser('~/miniconda3'),
+            os.path.expanduser('~/miniforge3'),
+            os.path.expanduser('~/mambaforge'),
+        ]
+        for base in conda_bases:
+            hits = sorted(Path(base).glob('envs/*/bin/whisper'))
+            if hits:
+                return str(hits[0])
+            w_base = Path(base) / 'bin' / 'whisper'
+            if w_base.exists():
+                return str(w_base)
     return 'whisper'
 
 FFMPEG_BIN  = _find_ffmpeg()
@@ -423,7 +469,8 @@ class WhisperWorker(QThread):
         self.log.emit(f"Whisper: model={self.model}  lang={self.language}")
 
         env = os.environ.copy()
-        env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        if sys.platform != 'win32':
+            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
 
         try:
             self._proc = subprocess.Popen(
@@ -514,7 +561,8 @@ class BatchWhisperWorker(QThread):
         total   = len(self.files)
         success = 0
         env     = os.environ.copy()
-        env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        if sys.platform != 'win32':
+            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
 
         for i, video in enumerate(self.files):
             if self._stop:
