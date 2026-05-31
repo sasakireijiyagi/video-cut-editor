@@ -139,18 +139,13 @@ APPLESCRIPT
 # 隔離属性を解除
 xattr -cr "$APP_PATH" 2>/dev/null || true
 
-# ── アイコンを設定（AppKit経由） ──────────────────────────────────
+# ── アイコンを設定（fileicon経由） ───────────────────────────────
 ICON_SRC="$SCRIPT_DIR/AppIcon.icns"
 if [ -f "$ICON_SRC" ]; then
-    "$PYTHON_BIN" - "$APP_PATH" "$ICON_SRC" << 'PYEOF'
-import sys
-from AppKit import NSWorkspace, NSImage
-app_path  = sys.argv[1]
-icon_path = sys.argv[2]
-icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
-NSWorkspace.sharedWorkspace().setIcon_forFile_options_(icon, app_path, 0)
-print("✓ アイコン設定完了")
-PYEOF
+    if ! command -v fileicon &>/dev/null; then
+        $BREW install fileicon --quiet
+    fi
+    fileicon set "$APP_PATH" "$ICON_SRC" && echo "✓ アイコン設定完了" || echo "  アイコン設定スキップ"
 fi
 
 echo ""
