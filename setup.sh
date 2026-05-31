@@ -139,20 +139,18 @@ APPLESCRIPT
 # 隔離属性を解除
 xattr -cr "$APP_PATH" 2>/dev/null || true
 
-# ── アイコンを設定 ────────────────────────────────────────────────
+# ── アイコンを設定（AppKit経由） ──────────────────────────────────
 ICON_SRC="$SCRIPT_DIR/AppIcon.icns"
 if [ -f "$ICON_SRC" ]; then
-    mkdir -p "$APP_PATH/Contents/Resources"
-    cp "$ICON_SRC" "$APP_PATH/Contents/Resources/AppIcon.icns"
-    # 既存のInfo.plistにアイコンキーだけ追加（上書きしない）
-    PLIST="$APP_PATH/Contents/Info.plist"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$PLIST" 2>/dev/null || \
-    /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST"
-    # アイコンキャッシュを強制クリア
-    touch "$APP_PATH"
-    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_PATH" 2>/dev/null || true
-    killall Finder 2>/dev/null || true
-    echo "✓ アイコン設定完了"
+    "$PYTHON_BIN" - "$APP_PATH" "$ICON_SRC" << 'PYEOF'
+import sys
+from AppKit import NSWorkspace, NSImage
+app_path  = sys.argv[1]
+icon_path = sys.argv[2]
+icon = NSImage.alloc().initWithContentsOfFile_(icon_path)
+NSWorkspace.sharedWorkspace().setIcon_forFile_options_(icon, app_path, 0)
+print("✓ アイコン設定完了")
+PYEOF
 fi
 
 echo ""
