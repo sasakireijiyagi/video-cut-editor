@@ -129,9 +129,15 @@ chmod +x "$SCRIPT_DIR/run.sh"
 APP_PATH="$SCRIPT_DIR/VideoCutEditor.app"
 RUN_SH="$SCRIPT_DIR/run.sh"
 
+# 古いアプリを削除してから再生成
+rm -rf "$APP_PATH"
+
 osacompile -o "$APP_PATH" - << APPLESCRIPT
 do shell script "$RUN_SH > /dev/null 2>&1 &"
 APPLESCRIPT
+
+# 隔離属性を解除
+xattr -cr "$APP_PATH" 2>/dev/null || true
 
 # ── アイコンを設定 ────────────────────────────────────────────────
 ICON_SRC="$SCRIPT_DIR/AppIcon.icns"
@@ -142,9 +148,10 @@ if [ -f "$ICON_SRC" ]; then
     PLIST="$APP_PATH/Contents/Info.plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$PLIST" 2>/dev/null || \
     /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST"
-    # Finderキャッシュをリフレッシュ
+    # アイコンキャッシュを強制クリア
     touch "$APP_PATH"
     /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_PATH" 2>/dev/null || true
+    killall Finder 2>/dev/null || true
     echo "✓ アイコン設定完了"
 fi
 
