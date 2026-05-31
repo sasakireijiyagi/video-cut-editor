@@ -46,13 +46,14 @@ from typing import List, Optional
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox,
+    QGraphicsOpacityEffect,
     QLabel, QFileDialog, QLineEdit, QRadioButton, QGroupBox,
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
     QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox,
     QDialog, QDialogButtonBox, QMenuBar,
 )
-from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtGui import QKeySequence, QShortcut, QFont, QFontDatabase, QPainter, QColor
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -1734,6 +1735,10 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dlg)
         layout.setSpacing(12)
 
+        brand = QLabel("<p style='text-align:center; font-size:22px;'>ヤギ製作所</p>")
+        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(brand)
+
         title = QLabel("<h2>Video Cut Editor</h2>")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
@@ -1767,14 +1772,110 @@ class MainWindow(QMainWindow):
 
 
 # ──────────────────────────────────────────────────────────────────
+# Splash screen
+# ──────────────────────────────────────────────────────────────────
+
+class SplashScreen(QWidget):
+    finished = pyqtSignal()
+
+    def __init__(self, font_id: int):
+        super().__init__()
+        self.setWindowFlags(
+            Qt.WindowType.SplashScreen |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setFixedSize(640, 380)
+
+        # 中央に配置
+        screen = QApplication.primaryScreen().geometry()
+        self.move((screen.width() - 640) // 2, (screen.height() - 380) // 2)
+
+        # フォント設定
+        if font_id >= 0:
+            families = QFontDatabase.applicationFontFamilies(font_id)
+            self._font_family = families[0] if families else 'Hiragino Mincho ProN'
+        else:
+            self._font_family = 'Hiragino Mincho ProN'
+
+        # フェードエフェクト
+        self._effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self._effect)
+        self._effect.setOpacity(0.0)
+
+        # フェードイン → 保持 → フェードアウト
+        self._anim_in = QPropertyAnimation(self._effect, b'opacity')
+        self._anim_in.setDuration(800)
+        self._anim_in.setStartValue(0.0)
+        self._anim_in.setEndValue(1.0)
+        self._anim_in.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._anim_in.finished.connect(self._hold)
+
+        self._anim_out = QPropertyAnimation(self._effect, b'opacity')
+        self._anim_out.setDuration(800)
+        self._anim_out.setStartValue(1.0)
+        self._anim_out.setEndValue(0.0)
+        self._anim_out.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self._anim_out.finished.connect(self._done)
+
+    def start(self):
+        self.show()
+        self._anim_in.start()
+
+    def _hold(self):
+        QTimer.singleShot(1500, self._anim_out.start)
+
+    def _done(self):
+        self.close()
+        self.finished.emit()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # 背景：白・角丸
+        painter.setBrush(QColor('#ffffff'))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), 12, 12)
+
+        # ヤギ製作所
+        f1 = QFont(self._font_family, 72)
+        painter.setFont(f1)
+        painter.setPen(QColor('#2c2c2c'))
+        painter.drawText(self.rect().adjusted(0, -40, 0, 0),
+                         Qt.AlignmentFlag.AlignCenter, 'ヤギ製作所')
+
+        # 佐々木玲仁研究室
+        f2 = QFont(self._font_family, 18)
+        painter.setFont(f2)
+        painter.setPen(QColor('#555555'))
+        painter.drawText(self.rect().adjusted(0, 140, 0, 0),
+                         Qt.AlignmentFlag.AlignCenter, '佐々木玲仁研究室')
+
+
+# ──────────────────────────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────────────────────────
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Video Cut Editor")
-    win = MainWindow()
-    win.show()
+
+    # Klee One フォントを読み込む
+    font_path = str(Path(__file__).parent / 'fonts' / 'KleeOne-Regular.ttf')
+    font_id = QFontDatabase.addApplicationFont(font_path)
+
+    # スプラッシュ画面
+    splash = SplashScreen(font_id)
+    win    = MainWindow()
+
+    def _show_main():
+        win.show()
+
+    splash.finished.connect(_show_main)
+    splash.start()
+
     sys.exit(app.exec())
 
 
