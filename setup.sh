@@ -138,20 +138,10 @@ ICON_SRC="$SCRIPT_DIR/AppIcon.icns"
 if [ -f "$ICON_SRC" ]; then
     mkdir -p "$APP_PATH/Contents/Resources"
     cp "$ICON_SRC" "$APP_PATH/Contents/Resources/AppIcon.icns"
-    cat > "$APP_PATH/Contents/Info.plist" << PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleName</key>
-    <string>Video Cut Editor</string>
-    <key>CFBundleDisplayName</key>
-    <string>Video Cut Editor</string>
-</dict>
-</plist>
-PLIST
+    # 既存のInfo.plistにアイコンキーだけ追加（上書きしない）
+    PLIST="$APP_PATH/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$PLIST"
     # Finderキャッシュをリフレッシュ
     touch "$APP_PATH"
     /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP_PATH" 2>/dev/null || true
