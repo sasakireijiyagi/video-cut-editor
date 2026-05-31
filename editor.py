@@ -1863,7 +1863,7 @@ def main():
     app.setApplicationName("Video Cut Editor")
 
     # Klee One フォントを読み込む
-    font_path = str(Path(__file__).parent / 'fonts' / 'KleeOne-Regular.ttf')
+    font_path = str(Path(__file__).parent / 'fonts' / 'HinaMincho-Regular.ttf')
     font_id = QFontDatabase.addApplicationFont(font_path)
 
     # スプラッシュ画面
