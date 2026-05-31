@@ -46,7 +46,7 @@ from typing import List, Optional
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QSplitter, QTableWidget, QTableWidgetItem, QPushButton, QCheckBox,
-    QGraphicsOpacityEffect,
+    QGraphicsOpacityEffect, QListWidget,
     QLabel, QFileDialog, QLineEdit, QRadioButton, QGroupBox,
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
     QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox,
