@@ -54,7 +54,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QKeySequence, QShortcut, QFont, QFontDatabase, QPainter, QColor
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtGui import QDesktopServices, QUndoStack, QUndoCommand
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -1067,6 +1067,35 @@ class FindReplaceDialog(QDialog):
 
 
 # ──────────────────────────────────────────────────────────────────
+# Undo command for SRT text edits
+# ──────────────────────────────────────────────────────────────────
+
+class EditTextCommand(QUndoCommand):
+    def __init__(self, srt_table, row: int, old_text: str, new_text: str):
+        super().__init__(f"テキスト編集 (行 {row + 1})")
+        self.srt_table = srt_table
+        self.row       = row
+        self.old_text  = old_text
+        self.new_text  = new_text
+
+    def redo(self):
+        self.srt_table.entries[self.row].text = self.new_text
+        self.srt_table.tbl.blockSignals(True)
+        item = self.srt_table.tbl.item(self.row, 3)
+        if item:
+            item.setText(self.new_text)
+        self.srt_table.tbl.blockSignals(False)
+
+    def undo(self):
+        self.srt_table.entries[self.row].text = self.old_text
+        self.srt_table.tbl.blockSignals(True)
+        item = self.srt_table.tbl.item(self.row, 3)
+        if item:
+            item.setText(self.old_text)
+        self.srt_table.tbl.blockSignals(False)
+
+
+# ──────────────────────────────────────────────────────────────────
 # SRT table widget
 # ──────────────────────────────────────────────────────────────────
 
@@ -1076,6 +1105,7 @@ class SRTTable(QWidget):
     def __init__(self):
         super().__init__()
         self.entries: List[SRTEntry] = []
+        self.undo_stack = QUndoStack(self)
         self._build()
 
     def _build(self):
@@ -1113,6 +1143,10 @@ class SRTTable(QWidget):
         self.tbl.itemSelectionChanged.connect(self._on_sel)
         self.tbl.itemChanged.connect(self._on_changed)
         vbox.addWidget(self.tbl)
+
+        # Undo / Redo ショートカット
+        QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self.undo_stack.undo)
+        QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self.undo_stack.redo)
 
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
@@ -1161,7 +1195,11 @@ class SRTTable(QWidget):
             self.entries[row].checked = (item.checkState() == Qt.CheckState.Checked)
             self._update_count()
         elif item.column() == 3:
-            self.entries[row].text = item.text()
+            old_text = self.entries[row].text
+            new_text = item.text()
+            if old_text != new_text:
+                cmd = EditTextCommand(self, row, old_text, new_text)
+                self.undo_stack.push(cmd)
 
     def _on_sel(self):
         if self.tbl.selectedItems():
