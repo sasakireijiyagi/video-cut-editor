@@ -669,13 +669,17 @@ class BatchDialog(QDialog):
         vbox.addWidget(self.file_list)
 
         btn_row = QHBoxLayout()
-        btn_add    = QPushButton('追加…' if _lang == 'ja' else 'Add…')
+        btn_add    = QPushButton('ファイルを追加…' if _lang == 'ja' else 'Add Files…')
+        btn_add_dir= QPushButton('フォルダを追加…' if _lang == 'ja' else 'Add Folder…')
         btn_remove = QPushButton('削除' if _lang == 'ja' else 'Remove')
         btn_clear  = QPushButton('全クリア' if _lang == 'ja' else 'Clear All')
+        btn_add.setToolTip('Cmd+クリックで複数選択できます' if _lang == 'ja' else 'Cmd+click to select multiple')
         btn_add.clicked.connect(self._add_files)
+        btn_add_dir.clicked.connect(self._add_folder)
         btn_remove.clicked.connect(self._remove_selected)
         btn_clear.clicked.connect(self.file_list.clear)
         btn_row.addWidget(btn_add)
+        btn_row.addWidget(btn_add_dir)
         btn_row.addWidget(btn_remove)
         btn_row.addWidget(btn_clear)
         btn_row.addStretch()
@@ -741,18 +745,38 @@ class BatchDialog(QDialog):
         vbox.addLayout(exec_row)
 
     def _add_files(self):
+        start = getattr(self, '_last_dir', str(Path.home() / 'Downloads'))
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            '動画ファイルを選択' if _lang == 'ja' else 'Select video files',
-            str(Path.home() / 'Downloads'),
+            'ファイルを選択（Cmd+クリックで複数選択）' if _lang == 'ja' else 'Select files (Cmd+click for multiple)',
+            start,
             '動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;すべて (*)' if _lang == 'ja'
             else 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;All (*)')
+        if paths:
+            self._last_dir = str(Path(paths[0]).parent)
+        self._append_paths(paths)
+
+    def _add_folder(self):
+        start = getattr(self, '_last_dir', str(Path.home() / 'Downloads'))
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            'フォルダを選択' if _lang == 'ja' else 'Select folder',
+            start)
+        if not folder:
+            return
+        self._last_dir = folder
+        exts = {'.mp4', '.mov', '.MOV', '.avi', '.mkv', '.m4v'}
+        paths = [str(p) for p in sorted(Path(folder).iterdir())
+                 if p.suffix in exts]
+        self._append_paths(paths)
+
+    def _append_paths(self, paths):
+        existing = {self.file_list.item(i).text()
+                    for i in range(self.file_list.count())}
         for p in paths:
-            # 重複チェック
-            items = [self.file_list.item(i).text()
-                     for i in range(self.file_list.count())]
-            if p not in items:
+            if p not in existing:
                 self.file_list.addItem(p)
+                existing.add(p)
 
     def _remove_selected(self):
         for item in self.file_list.selectedItems():
