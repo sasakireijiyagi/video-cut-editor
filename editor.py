@@ -49,7 +49,7 @@ from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect, QListWidget,
     QLabel, QFileDialog, QLineEdit, QRadioButton, QGroupBox,
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
-    QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox,
+    QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox, QSpinBox,
     QDialog, QDialogButtonBox, QMenuBar,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QTimer, QPropertyAnimation, QEasingCurve
@@ -347,17 +347,61 @@ class FFmpegWorker(QThread):
     done     = pyqtSignal(bool, str)
 
     def __init__(self, entries: List[SRTEntry], video: str,
-                 outdir: str, combine: bool, reencode: bool):
+                 outdir: str, combine: bool, reencode: bool,
+                 subtitle_burn: bool = False, font_size: int = 0):
         super().__init__()
-        self.entries  = entries
-        self.video    = video
-        self.outdir   = outdir
-        self.combine  = combine
-        self.reencode = reencode
-        self._stop    = False
+        self.entries       = entries
+        self.video         = video
+        self.outdir        = outdir
+        self.combine       = combine
+        self.reencode      = reencode
+        self.subtitle_burn = subtitle_burn
+        self.font_size     = font_size  # 0 = auto
+        self._stop         = False
 
     def cancel(self):
         self._stop = True
+
+    # ── 字幕フィルタ文字列を生成 ──
+    def _subtitle_vf(self, srt_path: str) -> str:
+        font = self._pick_font()
+        size = self.font_size if self.font_size > 0 else 52
+        # ASSスタイルをffmpegのforce_styleで指定
+        # Alignment=2: 下中央, BorderStyle=1: 縁取り, Outline=4, Shadow=0
+        style = (
+            f"FontName={font},FontSize={size},Bold=1,"
+            "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+            "BorderStyle=1,Outline=4,Shadow=0,Alignment=2,"
+            "MarginV=30"
+        )
+        # srt_pathのバックスラッシュ・コロンをエスケープ（Windows対応）
+        escaped = srt_path.replace('\\', '/').replace(':', '\\:')
+        return f"subtitles='{escaped}':force_style='{style}'"
+
+    @staticmethod
+    def _pick_font() -> str:
+        candidates = [
+            'Hiragino Kaku Gothic ProN',
+            'Hiragino Sans',
+            'Noto Sans CJK JP Bold',
+            'NotoSansCJK-Bold',
+            'Yu Gothic Bold',
+            'Meiryo Bold',
+            'Arial Unicode MS',
+        ]
+        try:
+            import subprocess as sp
+            result = sp.run(['fc-list', ':lang=ja'], capture_output=True, text=True)
+            installed = result.stdout.lower()
+            for c in candidates:
+                if c.lower().replace(' ', '') in installed.replace(' ', ''):
+                    return c
+        except Exception:
+            pass
+        # macOS fallback
+        if sys.platform == 'darwin':
+            return 'Hiragino Kaku Gothic ProN'
+        return 'Arial Unicode MS'
 
     def run(self):
         checked = [e for e in self.entries if e.checked]
@@ -381,24 +425,58 @@ class FFmpegWorker(QThread):
         codec = (['-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac']
                  if self.reencode else ['-c', 'copy'])
 
+        # 字幕焼き込み用: 全エントリのSRTをtmpに書き出す
+        tmp_srt = None
+        if self.subtitle_burn:
+            import tempfile
+            tmp_srt = os.path.join(self.outdir, '_tmp_sub.srt')
+            lines = []
+            for idx, e in enumerate(checked, 1):
+                lines.append(str(idx))
+                # セグメント先頭を0基準にオフセット
+                lines.append(f"{_ms_to_srt(0)} --> {_ms_to_srt(e.end_ms - e.start_ms)}")
+                lines.append(e.text)
+                lines.append('')
+            # ダミー: 実際は各セグメント個別に作る（下のループで生成）
+
         segs: List[str] = []
         for i, entry in enumerate(checked):
             if self._stop:
                 self.done.emit(False, "Cancelled." if _lang == 'en' else "キャンセルされました")
+                if tmp_srt and os.path.exists(tmp_srt):
+                    os.remove(tmp_srt)
                 return
 
             start = _ms_to_ffmpeg(entry.start_ms)
             dur   = _ms_to_ffmpeg(entry.end_ms - entry.start_ms)
             out   = os.path.join(self.outdir, f"{stem}_{entry.index:04d}.mp4")
 
-            cmd = [FFMPEG_BIN, '-y',
-                   '-ss', start, '-i', self.video,
-                   '-t', dur,
-                   '-avoid_negative_ts', 'make_zero',
-                   *codec, out]
+            if self.subtitle_burn:
+                # セグメント単体SRT（0基準）を一時ファイルに書く
+                seg_srt = os.path.join(self.outdir, f'_seg_{entry.index:04d}.srt')
+                seg_dur = entry.end_ms - entry.start_ms
+                with open(seg_srt, 'w', encoding='utf-8') as f:
+                    f.write(f"1\n{_ms_to_srt(0)} --> {_ms_to_srt(seg_dur)}\n{entry.text}\n\n")
+                vf = self._subtitle_vf(seg_srt)
+                cmd = [FFMPEG_BIN, '-y',
+                       '-ss', start, '-i', self.video,
+                       '-t', dur,
+                       '-avoid_negative_ts', 'make_zero',
+                       '-vf', vf,
+                       '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', out]
+            else:
+                cmd = [FFMPEG_BIN, '-y',
+                       '-ss', start, '-i', self.video,
+                       '-t', dur,
+                       '-avoid_negative_ts', 'make_zero',
+                       *codec, out]
 
             self.log.emit(f"[{i+1}/{len(checked)}] seg {entry.index}  {start} + {dur}")
             proc = subprocess.run(cmd, capture_output=True, text=True)
+
+            if self.subtitle_burn and os.path.exists(seg_srt):
+                os.remove(seg_srt)
+
             if proc.returncode != 0:
                 self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
                 self.done.emit(False, f"{'Error on segment' if _lang=='en' else 'セグメントでエラー'} {entry.index}")
@@ -1647,6 +1725,39 @@ class MainWindow(QMainWindow):
         r1.addStretch()
         gv.addLayout(r1)
 
+        r_sub = QHBoxLayout()
+        self.chk_burn_sub = QCheckBox('字幕を焼き込む' if _lang == 'ja' else 'Burn subtitles')
+        self.chk_burn_sub.setToolTip('選択セグメントの字幕を映像に焼き込みます（再エンコード）'
+                                     if _lang == 'ja' else
+                                     'Burn subtitles into video (re-encodes)')
+        lbl_fsize = QLabel('フォントサイズ:' if _lang == 'ja' else 'Font size:')
+        self.spn_font_size = QSpinBox()
+        self.spn_font_size.setRange(20, 120)
+        self.spn_font_size.setValue(52)
+        self.spn_font_size.setSuffix(' px')
+        self.spn_font_size.setToolTip('0にすると自動' if _lang == 'ja' else 'Auto if 0')
+        self.btn_sub_preview = QPushButton('▶ プレビュー' if _lang == 'ja' else '▶ Preview')
+        self.btn_sub_preview.setToolTip('選択行1セグメントだけ焼き込んで確認'
+                                        if _lang == 'ja' else
+                                        'Render selected segment for preview')
+        self.btn_sub_preview.clicked.connect(self._preview_subtitle)
+
+        def _toggle_sub_ui(checked):
+            lbl_fsize.setEnabled(checked)
+            self.spn_font_size.setEnabled(checked)
+            self.btn_sub_preview.setEnabled(checked)
+        self.chk_burn_sub.toggled.connect(_toggle_sub_ui)
+        _toggle_sub_ui(False)
+
+        r_sub.addWidget(self.chk_burn_sub)
+        r_sub.addSpacing(16)
+        r_sub.addWidget(lbl_fsize)
+        r_sub.addWidget(self.spn_font_size)
+        r_sub.addSpacing(16)
+        r_sub.addWidget(self.btn_sub_preview)
+        r_sub.addStretch()
+        gv.addLayout(r_sub)
+
         r2 = QHBoxLayout()
         self.lbl_output_dir = QLabel(tr('output_dir'))
         self.txt_dir = QLineEdit(str(Path.home() / "Downloads"))
@@ -1838,6 +1949,53 @@ class MainWindow(QMainWindow):
         if row < len(self.srt_tbl.entries):
             self.player.play_segment(self.srt_tbl.entries[row])
 
+    def _preview_subtitle(self):
+        if not self.video_path:
+            QMessageBox.warning(self, tr('err_title'), tr('err_no_video'))
+            return
+        row = self.srt_tbl.tbl.currentRow()
+        entries = self.srt_tbl.entries
+        if row < 0 or row >= len(entries):
+            QMessageBox.warning(self, tr('err_title'),
+                '行を選択してください' if _lang == 'ja' else 'Please select a row.')
+            return
+        entry = entries[row]
+        import tempfile
+        outdir = tempfile.mkdtemp()
+        preview_out = os.path.join(outdir, 'subtitle_preview.mp4')
+        seg_srt     = os.path.join(outdir, 'preview.srt')
+        seg_dur     = entry.end_ms - entry.start_ms
+        with open(seg_srt, 'w', encoding='utf-8') as f:
+            f.write(f"1\n{_ms_to_srt(0)} --> {_ms_to_srt(seg_dur)}\n{entry.text}\n\n")
+
+        worker = FFmpegWorker(
+            [entry], self.video_path, outdir,
+            combine=False, reencode=False,
+            subtitle_burn=True, font_size=self.spn_font_size.value(),
+        )
+        vf  = worker._subtitle_vf(seg_srt)
+        start = _ms_to_ffmpeg(entry.start_ms)
+        dur   = _ms_to_ffmpeg(seg_dur)
+        cmd = [FFMPEG_BIN, '-y',
+               '-ss', start, '-i', self.video_path,
+               '-t', dur, '-avoid_negative_ts', 'make_zero',
+               '-vf', vf,
+               '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac',
+               preview_out]
+        self.log.append('プレビュー生成中…' if _lang == 'ja' else 'Generating preview…')
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            self.log.append(f"ERROR: {proc.stderr[-300:]}")
+            return
+        # プレビューをデフォルトアプリで開く
+        if sys.platform == 'darwin':
+            subprocess.Popen(['open', preview_out])
+        elif sys.platform == 'win32':
+            os.startfile(preview_out)
+        else:
+            subprocess.Popen(['xdg-open', preview_out])
+        self.log.append(f"{'Preview:' if _lang=='en' else 'プレビュー:'} {preview_out}")
+
     def _browse_dir(self):
         d = QFileDialog.getExistingDirectory(
             self, tr('dlg_output_dir'), self.txt_dir.text())
@@ -1864,6 +2022,8 @@ class MainWindow(QMainWindow):
             self.txt_dir.text(),
             self.rb_combine.isChecked(),
             self.chk_reencode.isChecked(),
+            subtitle_burn=self.chk_burn_sub.isChecked(),
+            font_size=self.spn_font_size.value(),
         )
         self.worker.progress.connect(self.progress.setValue)
         self.worker.log.connect(self.log.append)
