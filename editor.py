@@ -558,16 +558,24 @@ class BatchWhisperWorker(QThread):
         if self._proc:
             self._proc.terminate()
 
+    def add_files(self, paths: List[str]):
+        """実行中に追加ファイルをキューへ積む（スレッドセーフ: list.append はGIL保護）"""
+        for p in paths:
+            if p not in self.files:
+                self.files.append(p)
+
     def run(self):
-        total   = len(self.files)
         success = 0
         env     = os.environ.copy()
         if sys.platform != 'win32':
             env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
 
-        for i, video in enumerate(self.files):
+        i = 0
+        while i < len(self.files):
             if self._stop:
                 break
+            video = self.files[i]
+            total = len(self.files)  # 追加分を反映
 
             self.file_started.emit(i + 1, total, Path(video).name)
 
@@ -590,11 +598,13 @@ class BatchWhisperWorker(QThread):
                 self._proc.wait()
             except Exception as exc:
                 self.file_done.emit(i + 1, total, False, str(exc))
+                i += 1
                 continue
 
             if self._proc.returncode != 0:
                 self.file_done.emit(i + 1, total, False,
                     f"whisper error (code {self._proc.returncode})")
+                i += 1
                 continue
 
             # SRTを探す
@@ -607,6 +617,7 @@ class BatchWhisperWorker(QThread):
 
             if not srt.exists():
                 self.file_done.emit(i + 1, total, False, f"SRT not found: {srt}")
+                i += 1
                 continue
 
             # [間] 挿入
@@ -634,8 +645,9 @@ class BatchWhisperWorker(QThread):
 
             success += 1
             self.file_done.emit(i + 1, total, True, str(srt))
+            i += 1
 
-        self.all_done.emit(success, total)
+        self.all_done.emit(success, len(self.files))
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -669,19 +681,19 @@ class BatchDialog(QDialog):
         vbox.addWidget(self.file_list)
 
         btn_row = QHBoxLayout()
-        btn_add    = QPushButton('ファイルを追加…' if _lang == 'ja' else 'Add Files…')
-        btn_add_dir= QPushButton('フォルダを追加…' if _lang == 'ja' else 'Add Folder…')
-        btn_remove = QPushButton('削除' if _lang == 'ja' else 'Remove')
-        btn_clear  = QPushButton('全クリア' if _lang == 'ja' else 'Clear All')
-        btn_add.setToolTip('Cmd+クリックで複数選択できます' if _lang == 'ja' else 'Cmd+click to select multiple')
-        btn_add.clicked.connect(self._add_files)
-        btn_add_dir.clicked.connect(self._add_folder)
-        btn_remove.clicked.connect(self._remove_selected)
-        btn_clear.clicked.connect(self.file_list.clear)
-        btn_row.addWidget(btn_add)
-        btn_row.addWidget(btn_add_dir)
-        btn_row.addWidget(btn_remove)
-        btn_row.addWidget(btn_clear)
+        self.btn_add     = QPushButton('ファイルを追加…' if _lang == 'ja' else 'Add Files…')
+        self.btn_add_dir = QPushButton('フォルダを追加…' if _lang == 'ja' else 'Add Folder…')
+        self.btn_remove  = QPushButton('削除' if _lang == 'ja' else 'Remove')
+        self.btn_clear   = QPushButton('全クリア' if _lang == 'ja' else 'Clear All')
+        self.btn_add.setToolTip('Cmd+クリックで複数選択できます' if _lang == 'ja' else 'Cmd+click to select multiple')
+        self.btn_add.clicked.connect(self._add_files)
+        self.btn_add_dir.clicked.connect(self._add_folder)
+        self.btn_remove.clicked.connect(self._remove_selected)
+        self.btn_clear.clicked.connect(self.file_list.clear)
+        btn_row.addWidget(self.btn_add)
+        btn_row.addWidget(self.btn_add_dir)
+        btn_row.addWidget(self.btn_remove)
+        btn_row.addWidget(self.btn_clear)
         btn_row.addStretch()
         vbox.addLayout(btn_row)
 
@@ -720,6 +732,10 @@ class BatchDialog(QDialog):
         vbox.addLayout(cfg)
 
         # ── 進捗 ──
+        self.lbl_current = QLabel('')
+        self.lbl_current.setVisible(False)
+        vbox.addWidget(self.lbl_current)
+
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         vbox.addWidget(self.progress)
@@ -773,10 +789,13 @@ class BatchDialog(QDialog):
     def _append_paths(self, paths):
         existing = {self.file_list.item(i).text()
                     for i in range(self.file_list.count())}
-        for p in paths:
-            if p not in existing:
-                self.file_list.addItem(p)
-                existing.add(p)
+        new_paths = [p for p in paths if p not in existing]
+        for p in new_paths:
+            self.file_list.addItem(p)
+        if new_paths and self._worker and self._worker.isRunning():
+            self._worker.add_files(new_paths)
+            n = self.file_list.count()
+            self.progress.setRange(0, n)
 
     def _remove_selected(self):
         for item in self.file_list.selectedItems():
@@ -806,8 +825,11 @@ class BatchDialog(QDialog):
         self.progress.setRange(0, len(files))
         self.progress.setValue(0)
         self.progress.setVisible(True)
+        self.lbl_current.setVisible(True)
         self.btn_start.setEnabled(False)
         self.btn_cancel.setEnabled(True)
+        self.btn_remove.setEnabled(False)
+        self.btn_clear.setEnabled(False)
         self._worker.start()
 
     def _cancel(self):
@@ -816,6 +838,10 @@ class BatchDialog(QDialog):
         self.btn_cancel.setEnabled(False)
 
     def _on_file_started(self, current: int, total: int, name: str):
+        self.progress.setRange(0, total)
+        label = (f'処理中 [{current}/{total}]: {name}'
+                 if _lang == 'ja' else f'Processing [{current}/{total}]: {name}')
+        self.lbl_current.setText(label)
         self.log.append(f"\n[{current}/{total}] {name}")
 
     def _on_file_done(self, current: int, total: int, ok: bool, msg: str):
@@ -826,6 +852,9 @@ class BatchDialog(QDialog):
     def _on_all_done(self, success: int, total: int):
         self.btn_start.setEnabled(True)
         self.btn_cancel.setEnabled(False)
+        self.btn_remove.setEnabled(True)
+        self.btn_clear.setEnabled(True)
+        self.lbl_current.setVisible(False)
         msg = (f"完了: {success}/{total} ファイル処理しました"
                if _lang == 'ja' else f"Done: {success}/{total} files processed.")
         self.log.append(f"\n{'='*40}\n{msg}")
@@ -1094,6 +1123,37 @@ class FindReplaceDialog(QDialog):
 # Undo command for SRT text edits
 # ──────────────────────────────────────────────────────────────────
 
+class NudgeTimeCommand(QUndoCommand):
+    def __init__(self, srt_table, row: int, col: int, delta_ms: int):
+        label = '開始' if col == 1 else '終了'
+        sign  = f'+{delta_ms}ms' if delta_ms > 0 else f'{delta_ms}ms'
+        super().__init__(f"{label}微調整 {sign} (行 {row + 1})")
+        self.srt_table = srt_table
+        self.row       = row
+        self.col       = col
+        self.delta_ms  = delta_ms
+
+    def _apply(self, delta: int):
+        entry = self.srt_table.entries[self.row]
+        if self.col == 1:
+            entry.start_ms = max(0, entry.start_ms + delta)
+            ms = entry.start_ms
+        else:
+            entry.end_ms = max(0, entry.end_ms + delta)
+            ms = entry.end_ms
+        self.srt_table.tbl.blockSignals(True)
+        item = self.srt_table.tbl.item(self.row, self.col)
+        if item:
+            item.setText(_ms_to_srt(ms))
+        self.srt_table.tbl.blockSignals(False)
+
+    def redo(self):
+        self._apply(self.delta_ms)
+
+    def undo(self):
+        self._apply(-self.delta_ms)
+
+
 class EditTimeCommand(QUndoCommand):
     def __init__(self, srt_table, row: int, col: int, old_ms: int, new_ms: int):
         label = '開始時間' if col == 1 else '終了時間'
@@ -1185,6 +1245,45 @@ class SRTTable(QWidget):
         bar.addWidget(self.lbl_count)
         vbox.addLayout(bar)
 
+        # 微調整ツールバー
+        nudge_bar = QHBoxLayout()
+        nudge_bar.setSpacing(2)
+        self._nudge_step = 100  # ms
+
+        lbl_step = QLabel('ステップ:' if _lang == 'ja' else 'Step:')
+        self.rdo_100 = QRadioButton('100ms')
+        self.rdo_500 = QRadioButton('500ms')
+        self.rdo_100.setChecked(True)
+        self.rdo_100.toggled.connect(lambda on: setattr(self, '_nudge_step', 100) if on else None)
+        self.rdo_500.toggled.connect(lambda on: setattr(self, '_nudge_step', 500) if on else None)
+
+        lbl_start = QLabel('開始:' if _lang == 'ja' else 'Start:')
+        self.btn_s_back = QPushButton('◀')
+        self.btn_s_fwd  = QPushButton('▶')
+        self.btn_s_back.setFixedWidth(32)
+        self.btn_s_fwd.setFixedWidth(32)
+        self.btn_s_back.setToolTip('開始時間を戻す' if _lang == 'ja' else 'Move start earlier')
+        self.btn_s_fwd.setToolTip('開始時間を進める' if _lang == 'ja' else 'Move start later')
+        self.btn_s_back.clicked.connect(lambda: self._nudge(1, -1))
+        self.btn_s_fwd.clicked.connect(lambda: self._nudge(1, +1))
+
+        lbl_end = QLabel('終了:' if _lang == 'ja' else 'End:')
+        self.btn_e_back = QPushButton('◀')
+        self.btn_e_fwd  = QPushButton('▶')
+        self.btn_e_back.setFixedWidth(32)
+        self.btn_e_fwd.setFixedWidth(32)
+        self.btn_e_back.setToolTip('終了時間を戻す' if _lang == 'ja' else 'Move end earlier')
+        self.btn_e_fwd.setToolTip('終了時間を進める' if _lang == 'ja' else 'Move end later')
+        self.btn_e_back.clicked.connect(lambda: self._nudge(2, -1))
+        self.btn_e_fwd.clicked.connect(lambda: self._nudge(2, +1))
+
+        for w in (lbl_step, self.rdo_100, self.rdo_500,
+                  lbl_start, self.btn_s_back, self.btn_s_fwd,
+                  lbl_end,   self.btn_e_back, self.btn_e_fwd):
+            nudge_bar.addWidget(w)
+        nudge_bar.addStretch()
+        vbox.addLayout(nudge_bar)
+
         self.tbl = QTableWidget(0, 4)
         self.tbl.setHorizontalHeaderLabels(tr('tbl_headers'))
         hh = self.tbl.horizontalHeader()
@@ -1269,6 +1368,14 @@ class SRTTable(QWidget):
             if old_text != new_text:
                 cmd = EditTextCommand(self, row, old_text, new_text)
                 self.undo_stack.push(cmd)
+
+    def _nudge(self, col: int, direction: int):
+        row = self.tbl.currentRow()
+        if row < 0 or row >= len(self.entries):
+            return
+        delta = direction * self._nudge_step
+        cmd = NudgeTimeCommand(self, row, col, delta)
+        self.undo_stack.push(cmd)
 
     def _on_sel(self):
         if self.tbl.selectedItems():
