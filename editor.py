@@ -1697,17 +1697,17 @@ class MainWindow(QMainWindow):
         vbox.addLayout(w_bar)
 
         # ── スプリッター ─────────────────────────────
-        spl = QSplitter(Qt.Orientation.Horizontal)
+        self.spl = QSplitter(Qt.Orientation.Horizontal)
 
         self.player = VideoPlayer()
-        spl.addWidget(self.player)
+        self.spl.addWidget(self.player)
 
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
-        spl.addWidget(self.srt_tbl)
+        self.spl.addWidget(self.srt_tbl)
 
-        spl.setSizes([500, 600])
-        vbox.addWidget(spl, stretch=1)
+        self.spl.setSizes([500, 600])
+        vbox.addWidget(self.spl, stretch=1)
 
         # ── 出力設定 ──────────────────────────────────
         self.grp_output = QGroupBox(tr('output_group'))
@@ -1878,6 +1878,21 @@ class MainWindow(QMainWindow):
 
     # ── スロット ──────────────────────────────────────
 
+    @staticmethod
+    def _probe_size(path: str):
+        """ffprobeで (width, height) を返す。失敗時は (0, 0)。"""
+        ffprobe = shutil.which('ffprobe') or FFMPEG_BIN.replace('ffmpeg', 'ffprobe')
+        try:
+            r = subprocess.run(
+                [ffprobe, '-v', 'error', '-select_streams', 'v:0',
+                 '-show_entries', 'stream=width,height',
+                 '-of', 'csv=s=x:p=0', path],
+                capture_output=True, text=True, timeout=10)
+            w, h = r.stdout.strip().split('x')
+            return int(w), int(h)
+        except Exception:
+            return 0, 0
+
     def _open_video(self):
         path, _ = QFileDialog.getOpenFileName(
             self, tr('dlg_open_video'),
@@ -1893,6 +1908,21 @@ class MainWindow(QMainWindow):
         self.btn_save_srt.setEnabled(False)
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
+
+        # 縦動画判定 → レイアウト・フォントサイズを自動調整
+        w, h = self._probe_size(path)
+        is_vertical = h > w > 0
+        if is_vertical:
+            self.spl.setOrientation(Qt.Orientation.Vertical)
+            self.spl.setSizes([400, 400])
+            self.spn_font_size.setValue(36)
+            self.log.append('縦動画を検出: レイアウトを縦並びに変更' if _lang == 'ja'
+                            else 'Vertical video detected: switched to vertical layout')
+        else:
+            self.spl.setOrientation(Qt.Orientation.Horizontal)
+            self.spl.setSizes([500, 600])
+            self.spn_font_size.setValue(52)
+
         for ext in ('.srt', '.SRT'):
             candidate = Path(path).with_suffix(ext)
             if candidate.exists():
