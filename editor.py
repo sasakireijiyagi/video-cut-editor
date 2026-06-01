@@ -1094,6 +1094,37 @@ class FindReplaceDialog(QDialog):
 # Undo command for SRT text edits
 # ──────────────────────────────────────────────────────────────────
 
+class EditTimeCommand(QUndoCommand):
+    def __init__(self, srt_table, row: int, col: int, old_ms: int, new_ms: int):
+        label = '開始時間' if col == 1 else '終了時間'
+        super().__init__(f"{label}編集 (行 {row + 1})")
+        self.srt_table = srt_table
+        self.row    = row
+        self.col    = col
+        self.old_ms = old_ms
+        self.new_ms = new_ms
+
+    def _apply(self, ms: int):
+        entry = self.srt_table.entries[self.row]
+        if self.col == 1:
+            entry.start_ms = ms
+        else:
+            entry.end_ms = ms
+        self.srt_table.tbl.blockSignals(True)
+        item = self.srt_table.tbl.item(self.row, self.col)
+        if item:
+            item.setText(_ms_to_srt(ms))
+            item.setBackground(Qt.GlobalColor.transparent)
+        self.srt_table.tbl.blockSignals(False)
+        self.srt_table._update_count()
+
+    def redo(self):
+        self._apply(self.new_ms)
+
+    def undo(self):
+        self._apply(self.old_ms)
+
+
 class EditTextCommand(QUndoCommand):
     def __init__(self, srt_table, row: int, old_text: str, new_text: str):
         super().__init__(f"テキスト編集 (行 {row + 1})")
@@ -1203,7 +1234,7 @@ class SRTTable(QWidget):
 
             for col, val in [(1, _ms_to_srt(e.start_ms)), (2, _ms_to_srt(e.end_ms))]:
                 item = QTableWidgetItem(val)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setToolTip('HH:MM:SS,mmm 形式で編集できます')
                 self.tbl.setItem(row, col, item)
 
             self.tbl.setItem(row, 3, QTableWidgetItem(e.text.replace('\n', ' ')))
@@ -1218,6 +1249,20 @@ class SRTTable(QWidget):
         if item.column() == 0:
             self.entries[row].checked = (item.checkState() == Qt.CheckState.Checked)
             self._update_count()
+        elif item.column() in (1, 2):
+            entry  = self.entries[row]
+            old_ms = entry.start_ms if item.column() == 1 else entry.end_ms
+            new_ms = _ts_to_ms(item.text())
+            if new_ms == 0 and item.text().strip() not in ('00:00:00,000', '0:00:00,000'):
+                # パース失敗 → 赤背景で元に戻す
+                self.tbl.blockSignals(True)
+                item.setText(_ms_to_srt(old_ms))
+                item.setBackground(QColor('#ffcccc'))
+                self.tbl.blockSignals(False)
+                QTimer.singleShot(1200, lambda: item.setBackground(Qt.GlobalColor.transparent))
+            elif new_ms != old_ms:
+                cmd = EditTimeCommand(self, row, item.column(), old_ms, new_ms)
+                self.undo_stack.push(cmd)
         elif item.column() == 3:
             old_text = self.entries[row].text
             new_text = item.text()
