@@ -1435,6 +1435,63 @@ class MergeCommand(QUndoCommand):
         st._repopulate()
 
 
+def _make_eaf(entries: List['SRTEntry'], video_path: str, tier_name: str) -> str:
+    """SRTエントリからELAN EAF形式のXML文字列を生成する"""
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%dT%H:%M:%S+09:00')
+    video_name = Path(video_path).name
+    video_url  = Path(video_path).as_uri()
+
+    # タイムスロットとアノテーションを構築
+    time_slots = []
+    annotations = []
+    for i, e in enumerate(entries):
+        ts1_id = f'ts{i*2+1}'
+        ts2_id = f'ts{i*2+2}'
+        ann_id = f'a{i+1}'
+        time_slots.append((ts1_id, e.start_ms))
+        time_slots.append((ts2_id, e.end_ms))
+        annotations.append((ann_id, ts1_id, ts2_id, e.text))
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f'<ANNOTATION_DOCUMENT AUTHOR="" DATE="{now}" FORMAT="3.0" VERSION="3.0"',
+        '    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
+        '    xsi:noNamespaceSchemaLocation="http://www.mpi.nl/tools/elan/EAFv3.0.xsd">',
+        f'    <HEADER MEDIA_FILE="" TIME_UNITS="milliseconds">',
+        f'        <MEDIA_DESCRIPTOR MEDIA_URL="{video_url}" MIME_TYPE="video/mp4"',
+        f'            RELATIVE_MEDIA_URL="{video_name}"/>',
+        '    </HEADER>',
+        '    <TIME_ORDER>',
+    ]
+    for ts_id, ts_val in time_slots:
+        lines.append(f'        <TIME_SLOT TIME_SLOT_ID="{ts_id}" TIME_VALUE="{ts_val}"/>')
+    lines.append('    </TIME_ORDER>')
+    lines.append(f'    <TIER LINGUISTIC_TYPE_REF="default-lt" TIER_ID="{tier_name}">')
+    for ann_id, ts1, ts2, text in annotations:
+        safe_text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+        lines += [
+            '        <ANNOTATION>',
+            f'            <ALIGNABLE_ANNOTATION ANNOTATION_ID="{ann_id}"',
+            f'                TIME_SLOT_REF1="{ts1}" TIME_SLOT_REF2="{ts2}">',
+            f'                <ANNOTATION_VALUE>{safe_text}</ANNOTATION_VALUE>',
+            '            </ALIGNABLE_ANNOTATION>',
+            '        </ANNOTATION>',
+        ]
+    lines += [
+        '    </TIER>',
+        '    <LINGUISTIC_TYPE GRAPHIC_REFERENCES="false" LINGUISTIC_TYPE_ID="default-lt" TIME_ALIGNABLE="true"/>',
+        '    <CONSTRAINT DESCRIPTION="Time subdivision of parent annotation\'s time interval, no time gaps allowed within this interval" STEREOTYPE="Time_Subdivision"/>',
+        '    <CONSTRAINT DESCRIPTION="Symbolic subdivision of a parent annotation. Annotations referring to the same parent are ordered" STEREOTYPE="Symbolic_Subdivision"/>',
+        '    <CONSTRAINT DESCRIPTION="1-1 association with a parent annotation" STEREOTYPE="Symbolic_Association"/>',
+        '    <CONSTRAINT DESCRIPTION="Time alignment of 2-3 child annotation" STEREOTYPE="Included_In"/>',
+        '</ANNOTATION_DOCUMENT>',
+    ]
+    return '\n'.join(lines)
+
+
 def _reindex(entries: List['SRTEntry']):
     for i, e in enumerate(entries):
         e.index = i + 1
@@ -1914,6 +1971,10 @@ class MainWindow(QMainWindow):
         self.btn_save_srt = QPushButton(tr('save_srt'))
         self.btn_save_srt.setEnabled(False)
         self.btn_save_srt.setToolTip(tr('save_srt_tip'))
+        self.btn_export_eaf = QPushButton('EAF書き出し' if _lang == 'ja' else 'Export EAF')
+        self.btn_export_eaf.setEnabled(False)
+        self.btn_export_eaf.setToolTip('ELAN用EAFファイルを書き出す' if _lang == 'ja' else 'Export as ELAN EAF file')
+        self.btn_export_eaf.clicked.connect(self._export_eaf)
         self.btn_close_video = QPushButton('✕')
         self.btn_close_video.setFixedWidth(28)
         self.btn_close_video.setEnabled(False)
@@ -1935,7 +1996,7 @@ class MainWindow(QMainWindow):
         self.btn_donate.setToolTip(tr('donate_tip'))
         self.btn_donate.clicked.connect(self._open_donate)
 
-        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
+        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt, self.btn_export_eaf):
             bar.addWidget(w)
         bar.addStretch()
         bar.addWidget(self.btn_lang)
@@ -2225,6 +2286,7 @@ class MainWindow(QMainWindow):
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
         self.btn_close_video.setEnabled(True)
+        self.btn_export_eaf.setEnabled(True)
 
         # 縦動画判定 → レイアウト・フォントサイズを自動調整
         w, h = self._probe_size(path)
@@ -2344,6 +2406,44 @@ class MainWindow(QMainWindow):
             subprocess.Popen(['xdg-open', preview_out])
         self.log.append(f"{'Preview:' if _lang=='en' else 'プレビュー:'} {preview_out}")
 
+    def _export_eaf(self):
+        if not self.video_path:
+            QMessageBox.warning(self, tr('err_title'), tr('err_no_video'))
+            return
+        entries = self.srt_tbl.entries
+        if not entries:
+            QMessageBox.warning(self, tr('err_title'),
+                'SRTが読み込まれていません' if _lang == 'ja' else 'No SRT loaded.')
+            return
+
+        # ティア名（発話者名）を入力
+        from PyQt6.QtWidgets import QInputDialog
+        tier, ok = QInputDialog.getText(
+            self,
+            'EAF書き出し' if _lang == 'ja' else 'Export EAF',
+            'ティア名（発話者名など）:' if _lang == 'ja' else 'Tier name (e.g. speaker name):',
+            text='発話' if _lang == 'ja' else 'utterance'
+        )
+        if not ok:
+            return
+        tier = tier.strip() or ('発話' if _lang == 'ja' else 'utterance')
+
+        # 保存先を選択
+        default = str(Path(self.video_path).with_suffix('.eaf'))
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            'EAFファイルを保存' if _lang == 'ja' else 'Save EAF file',
+            default, 'ELAN EAF (*.eaf);;すべて (*)')
+        if not path:
+            return
+
+        try:
+            eaf_text = _make_eaf(entries, self.video_path, tier)
+            Path(path).write_text(eaf_text, encoding='utf-8')
+            self.log.append(f"{'EAF書き出し完了' if _lang == 'ja' else 'EAF exported'}: {path}")
+        except Exception as exc:
+            QMessageBox.critical(self, tr('err_title'), str(exc))
+
     def _reset(self):
         self.video_path = None
         self.srt_path   = None
@@ -2353,6 +2453,7 @@ class MainWindow(QMainWindow):
         self.lbl_video.setText(tr('video_none'))
         self.lbl_srt.setText(tr('srt_none'))
         self.btn_save_srt.setEnabled(False)
+        self.btn_export_eaf.setEnabled(False)
         self.btn_close_video.setEnabled(False)
         self.btn_transcribe.setEnabled(False)
         self.log.append('--- ' + ('リセットしました' if _lang == 'ja' else 'Reset.') + ' ---')
