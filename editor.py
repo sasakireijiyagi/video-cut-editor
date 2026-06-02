@@ -332,6 +332,42 @@ DEFAULT_FILLERS = [
     'んー', 'んーと',
 ]
 
+# 言語コード → フィラーリスト（対応言語のみ）
+FILLER_LISTS = {
+    'ja': DEFAULT_FILLERS,
+    'en': [
+        'uh', 'um', 'er', 'erm', 'ah', 'oh',
+        'like', 'you know', 'you know what i mean',
+        'so', 'well', 'right', 'okay', 'ok',
+        'i mean', 'basically', 'actually', 'literally',
+        'kind of', 'sort of', 'anyway',
+    ],
+    'zh': [
+        '那个', '那个那个', '就是', '就是说', '然后', '然后呢',
+        '嗯', '啊', '哦', '呃', '这个', '对对对', '好',
+    ],
+    'ko': [
+        '어', '음', '그', '그러니까', '뭐', '아',
+        '이제', '그래서', '근데', '그냥', '좀',
+    ],
+    'es': [
+        'eh', 'este', 'esta', 'o sea', 'bueno',
+        'pues', 'entonces', 'osea', 'a ver',
+    ],
+    'fr': [
+        'euh', 'bah', 'ben', 'alors', 'enfin',
+        'voilà', 'quoi', 'genre', 'du coup',
+    ],
+    'de': [
+        'äh', 'ähm', 'also', 'halt', 'ne',
+        'oder', 'sozusagen', 'quasi', 'irgendwie',
+    ],
+    'pt': [
+        'é', 'ah', 'eh', 'tipo', 'né',
+        'então', 'assim', 'quer dizer', 'sabe',
+    ],
+}
+
 _LANG_MAP = {
     '日本語': 'ja',
     'English': 'en',
@@ -953,15 +989,40 @@ class BatchDialog(QDialog):
 # ──────────────────────────────────────────────────────────────────
 
 class FillerCutDialog(QDialog):
-    def __init__(self, srt_table, parent=None):
+    def __init__(self, srt_table, parent=None, transcribe_lang: str = 'ja'):
         super().__init__(parent)
         self.srt_table = srt_table
+        self.transcribe_lang = transcribe_lang
         self.setWindowTitle('フィラーカット' if _lang == 'ja' else 'Filler Cut')
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(420)
         self._build()
 
     def _build(self):
         vbox = QVBoxLayout(self)
+
+        fillers = FILLER_LISTS.get(self.transcribe_lang)
+        supported = fillers is not None
+        if not supported:
+            fillers = []
+
+        # 対応言語バッジ
+        lang_names = {
+            'ja': '日本語', 'en': 'English', 'zh': '中文', 'ko': '한국어',
+            'es': 'Español', 'fr': 'Français', 'de': 'Deutsch', 'pt': 'Português',
+        }
+        lang_name = lang_names.get(self.transcribe_lang, self.transcribe_lang)
+        if supported:
+            badge = QLabel(f'✅ {lang_name} のフィラーリストを使用中'
+                           if _lang == 'ja' else
+                           f'✅ Using filler list for {lang_name}')
+            badge.setStyleSheet('color: #2a7a2a; font-weight: bold;')
+        else:
+            badge = QLabel(f'⚠️ {lang_name} は未対応です。フィラー語を手動で入力してください。'
+                           if _lang == 'ja' else
+                           f'⚠️ {lang_name} is not supported. Enter filler words manually.')
+            badge.setStyleSheet('color: #a05000; font-weight: bold;')
+        badge.setWordWrap(True)
+        vbox.addWidget(badge)
 
         lbl = QLabel(
             '以下のテキストと完全一致するセグメントのチェックを外します。\n'
@@ -974,7 +1035,7 @@ class FillerCutDialog(QDialog):
         vbox.addWidget(lbl)
 
         self.txt_fillers = QTextEdit()
-        self.txt_fillers.setPlainText('\n'.join(DEFAULT_FILLERS))
+        self.txt_fillers.setPlainText('\n'.join(fillers))
         self.txt_fillers.setMaximumHeight(200)
         vbox.addWidget(self.txt_fillers)
 
@@ -1581,7 +1642,12 @@ class SRTTable(QWidget):
         dlg.show()
 
     def _open_filler_cut(self):
-        dlg = FillerCutDialog(self, self.window())
+        # メインウィンドウの文字起こし言語設定を取得
+        win = self.window()
+        lang_code = 'ja'
+        if hasattr(win, 'cmb_lang'):
+            lang_code = _LANG_MAP.get(win.cmb_lang.currentText(), 'ja')
+        dlg = FillerCutDialog(self, win, transcribe_lang=lang_code)
         dlg.exec()
 
     def load(self, entries: List[SRTEntry]):
