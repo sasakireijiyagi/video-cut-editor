@@ -1,6 +1,6 @@
-# EasyTranscribe
+# EasyTranscribe / おまかせ文字起こし
 
-[日本語](README.md)
+[日本語](README.md) ｜ [中文](README.zh.md) ｜ [한국어](README.ko.md)
 
 A local tool for video transcription, trimming, and subtitle burning.  
 Fully local · Free · No service shutdown risk. Mac / Windows supported.
@@ -17,8 +17,9 @@ If this tool is useful to you, please consider supporting development via the **
 Open video → Auto-transcribe (Whisper) → Uncheck unwanted segments → Export with ffmpeg
 ```
 
-- **Transcribe** lecture or meeting videos with [OpenAI Whisper](https://github.com/openai/whisper) (90+ languages supported)
-- **Edit** SRT segments — trim start/end times, edit text, fine-tune with ◀/▶ buttons
+- **Transcribe** lecture or meeting videos with [OpenAI Whisper](https://github.com/openai/whisper) — **90+ languages supported**
+- **Edit** SRT segments — trim start/end times, edit text, fine-tune with ◀/▶ nudge buttons
+- **Split** a segment at any character position; **merge** multiple segments into one
 - **Cut** selected segments and combine into one file or export separately
 - **Burn subtitles** directly into the video (bold Gothic font, white text, black outline)
 - **Batch transcription** — queue multiple files and add more while processing
@@ -28,7 +29,7 @@ Open video → Auto-transcribe (Whisper) → Uncheck unwanted segments → Expor
 
 ## Supported transcription languages
 
-Japanese · English · Chinese · Korean · Spanish · French · German · Portuguese · Italian · Russian · Arabic · Hindi · and 80+ more via Whisper's auto-detect mode.
+Japanese · English · Chinese · Korean · Spanish · French · German · Portuguese · Italian · Russian · Arabic · Hindi · and **80+ more** via Whisper's auto-detect mode.
 
 ---
 
@@ -98,9 +99,11 @@ Click "🎙 Transcribe". When done, segments appear in the table on the right.
 - Double-click the text column to edit inline
 - Double-click start/end time columns to edit directly (`HH:MM:SS,mmm` format)
 - Use **◀ / ▶ buttons** to nudge start/end times by 100ms or 500ms
+- **Right-click → Split row…** — click a character position to split; time is auto-calculated proportionally
+- **Right-click → Merge selected rows** — select consecutive rows and merge into one
 - All edits support **Ctrl+Z** undo / **Ctrl+Y** redo
 - **Ctrl+H** opens Find & Replace
-- **✂ Filler Cut** removes filler words (うーん, えー, etc.) in one click
+- **✂ Filler Cut** removes filler words in one click
 - **Save SRT** overwrites the original SRT file with your edits
 
 **④ Uncheck unwanted segments**  
