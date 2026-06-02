@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Cut Editor  —  SRT + 動画を読み込んでffmpegでカット出力
+おまかせ文字起こし  —  SRT + 動画を読み込んでffmpegでカット出力
 """
 
 import sys
@@ -65,7 +65,7 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 STRINGS = {
     'ja': {
-        'window_title'      : 'Video Cut Editor  —  by Reiji Sasaki',
+        'window_title'      : 'おまかせ文字起こし  —  by Reiji Sasaki',
         'open_video'        : '動画を開く…',
         'open_srt'          : 'SRTを開く…',
         'save_srt'          : 'SRT保存',
@@ -123,7 +123,7 @@ STRINGS = {
         'lang_toggle'       : 'EN',
     },
     'en': {
-        'window_title'      : 'Video Cut Editor  —  by Reiji Sasaki',
+        'window_title'      : 'おまかせ文字起こし  —  by Reiji Sasaki',
         'open_video'        : 'Open Video…',
         'open_srt'          : 'Open SRT…',
         'save_srt'          : 'Save SRT',
@@ -162,7 +162,7 @@ STRINGS = {
         'stop'              : '⏹ Stop',
         'menu_help'         : 'Help',
         'menu_about'        : 'About',
-        'about_title'       : 'About Video Cut Editor',
+        'about_title'       : 'About おまかせ文字起こし',
         'about_donate_link' : 'Support Development (Donate)',
         'dlg_open_video'    : 'Select video file',
         'dlg_video_filter'  : 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;All (*)',
@@ -2143,7 +2143,7 @@ class MainWindow(QMainWindow):
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(brand)
 
-        title = QLabel("<h2>Video Cut Editor</h2>")
+        title = QLabel("<h2>おまかせ文字起こし</h2>")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
@@ -2264,7 +2264,7 @@ class SplashScreen(QWidget):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("Video Cut Editor")
+    app.setApplicationName("おまかせ文字起こし")
 
     # Klee One フォントを読み込む
     font_path = str(Path(__file__).parent / 'fonts' / 'HinaMincho-Regular.ttf')
