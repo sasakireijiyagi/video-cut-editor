@@ -7,6 +7,8 @@
 
 ---
 
+도움이 되셨다면 **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** 를 눌러주세요 — 큰 힘이 됩니다!
+
 이 도구가 유용하셨다면, 앱 내 **❤ 개발 지원** 버튼을 통해 후원해 주시면 감사하겠습니다.
 
 ---

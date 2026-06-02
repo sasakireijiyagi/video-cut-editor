@@ -2384,6 +2384,17 @@ class MainWindow(QMainWindow):
         info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(info)
 
+        star_lbl = QLabel(
+            "<p style='text-align:center; font-size:13px;'>"
+            "役に立ったら "
+            "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>⭐ Star</a>"
+            " をつけてもらえると励みになります！"
+            "</p>"
+        )
+        star_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        star_lbl.setOpenExternalLinks(True)
+        layout.addWidget(star_lbl)
+
         links = QLabel(
             "<p style='text-align:center;'>"
             "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
