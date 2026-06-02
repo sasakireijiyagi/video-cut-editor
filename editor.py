@@ -392,7 +392,8 @@ class FFmpegWorker(QThread):
 
     def __init__(self, entries: List[SRTEntry], video: str,
                  outdir: str, combine: bool, reencode: bool,
-                 subtitle_burn: bool = False, font_size: int = 0):
+                 subtitle_burn: bool = False, font_size: int = 0,
+                 font_name: str = ''):
         super().__init__()
         self.entries       = entries
         self.video         = video
@@ -401,6 +402,7 @@ class FFmpegWorker(QThread):
         self.reencode      = reencode
         self.subtitle_burn = subtitle_burn
         self.font_size     = font_size  # 0 = auto
+        self.font_name     = font_name  # 空文字で自動
         self._stop         = False
 
     def cancel(self):
@@ -408,7 +410,7 @@ class FFmpegWorker(QThread):
 
     # ── 字幕フィルタ文字列を生成 ──
     def _subtitle_vf(self, srt_path: str) -> str:
-        font = self._pick_font()
+        font = self.font_name.strip() if self.font_name.strip() else self._pick_font()
         size = self.font_size if self.font_size > 0 else 52
         # ASSスタイルをffmpegのforce_styleで指定
         # Alignment=2: 下中央, BorderStyle=1: 縁取り, Outline=4, Shadow=0
@@ -2034,6 +2036,17 @@ class MainWindow(QMainWindow):
         self.spn_font_size.setValue(52)
         self.spn_font_size.setSuffix(' px')
         self.spn_font_size.setToolTip('0にすると自動' if _lang == 'ja' else 'Auto if 0')
+
+        lbl_font = QLabel('フォント:' if _lang == 'ja' else 'Font:')
+        self.txt_font = QLineEdit()
+        self.txt_font.setPlaceholderText('空欄で自動 / Auto if empty')
+        self.txt_font.setFixedWidth(200)
+        self.txt_font.setToolTip(
+            '空欄で言語に応じて自動選択。アラビア語など特殊文字は手動でフォント名を入力してください。'
+            if _lang == 'ja' else
+            'Leave blank for auto-selection. For Arabic, Hindi, etc., enter the font name manually.'
+        )
+
         self.btn_sub_preview = QPushButton('▶ プレビュー' if _lang == 'ja' else '▶ Preview')
         self.btn_sub_preview.setToolTip('選択行1セグメントだけ焼き込んで確認'
                                         if _lang == 'ja' else
@@ -2043,6 +2056,8 @@ class MainWindow(QMainWindow):
         def _toggle_sub_ui(checked):
             lbl_fsize.setEnabled(checked)
             self.spn_font_size.setEnabled(checked)
+            lbl_font.setEnabled(checked)
+            self.txt_font.setEnabled(checked)
             self.btn_sub_preview.setEnabled(checked)
         self.chk_burn_sub.toggled.connect(_toggle_sub_ui)
         _toggle_sub_ui(False)
@@ -2051,6 +2066,9 @@ class MainWindow(QMainWindow):
         r_sub.addSpacing(16)
         r_sub.addWidget(lbl_fsize)
         r_sub.addWidget(self.spn_font_size)
+        r_sub.addSpacing(16)
+        r_sub.addWidget(lbl_font)
+        r_sub.addWidget(self.txt_font)
         r_sub.addSpacing(16)
         r_sub.addWidget(self.btn_sub_preview)
         r_sub.addStretch()
@@ -2301,6 +2319,7 @@ class MainWindow(QMainWindow):
             [entry], self.video_path, outdir,
             combine=False, reencode=False,
             subtitle_burn=True, font_size=self.spn_font_size.value(),
+            font_name=self.txt_font.text(),
         )
         vf  = worker._subtitle_vf(seg_srt)
         start = _ms_to_ffmpeg(entry.start_ms)
@@ -2366,6 +2385,7 @@ class MainWindow(QMainWindow):
             self.chk_reencode.isChecked(),
             subtitle_burn=self.chk_burn_sub.isChecked(),
             font_size=self.spn_font_size.value(),
+            font_name=self.txt_font.text(),
         )
         self.worker.progress.connect(self.progress.setValue)
         self.worker.log.connect(self.log.append)
