@@ -9,7 +9,10 @@ Fully local · Free · No service shutdown risk. Mac / Windows supported.
 
 If this tool is useful to you, please give it a **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** — it really helps!
 
-If this tool is useful to you, please consider supporting development via the **❤ Support Development** button in the app.
+This tool is developed and maintained by a researcher at Kyushu University in his spare time.
+It has now reached users around the world.
+If it has helped your research or work, **even a small donation — the price of a coffee — would be a huge encouragement** ☕  
+Click the **❤ Support Development** button in the top-right corner of the app.
 
 ---
 
