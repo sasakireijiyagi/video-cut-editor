@@ -205,7 +205,8 @@ This is experimental software for research and educational use. No warranty is p
 
 ## License
 
-Free to use, modify, and distribute.
+[MIT License](LICENSE) © 2025 Reiji Sasaki  
+Free to use, modify, and distribute. Please retain the copyright notice.
 
 ---
 
