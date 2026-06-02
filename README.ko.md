@@ -7,6 +7,8 @@
 
 ---
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
+
 도움이 되셨다면 **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** 를 눌러주세요 — 큰 힘이 됩니다!
 
 이 도구는 규슈대학교 연구자가 여가 시간에 혼자 개발하고 유지하고 있습니다.
