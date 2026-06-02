@@ -24,7 +24,7 @@ Click the **❤ Support Development** button in the top-right corner of the app.
 Open video → Auto-transcribe (Whisper) → Uncheck unwanted segments → Export with ffmpeg
 ```
 
-- **Transcribe** lecture or meeting videos with [OpenAI Whisper](https://github.com/openai/whisper) — **90+ languages supported**
+- **Transcribe** lecture or meeting videos with [OpenAI Whisper](https://github.com/openai/whisper) — **100 languages supported**
 - **Edit** SRT segments — trim start/end times, edit text, fine-tune with ◀/▶ nudge buttons
 - **Split** a segment at any character position; **merge** multiple segments into one
 - **Cut** selected segments and combine into one file or export separately
