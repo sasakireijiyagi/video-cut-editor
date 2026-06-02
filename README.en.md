@@ -27,9 +27,20 @@ Open video → Auto-transcribe (Whisper) → Uncheck unwanted segments → Expor
 
 ---
 
-## Supported transcription languages
+## Supported transcription languages — 100 languages
 
-Japanese · English · Chinese · Korean · Spanish · French · German · Portuguese · Italian · Russian · Arabic · Hindi · and **80+ more** via Whisper's auto-detect mode.
+Whisper supports **100 languages** for transcription. The app's language selector offers 13 major languages + auto-detect.
+
+| Region | Languages |
+|--------|-----------|
+| East Asia | Japanese · Chinese (Mandarin & Cantonese) · Korean |
+| Southeast Asia | Indonesian · Malay · Thai · Vietnamese · Tagalog · Javanese · Khmer · Lao · Burmese |
+| South Asia | Hindi · Bengali · Urdu · Tamil · Telugu · Gujarati · Marathi · Punjabi · Nepali · Sinhala |
+| Middle East / Central Asia | Arabic · Persian · Hebrew · Turkish · Kazakh · Uzbek · Azerbaijani · Georgian · Armenian |
+| Europe (West) | English · Spanish · French · German · Italian · Portuguese · Dutch · Swedish · Norwegian · Danish · Finnish · Polish · Czech · Hungarian · Romanian · Greek |
+| Europe (East) | Russian · Ukrainian · Bulgarian · Serbian · Croatian · Slovak · Slovenian · Macedonian · Belarusian · Lithuanian · Latvian · Estonian |
+| Africa | Swahili · Hausa · Yoruba · Somali · Amharic · Shona · Lingala · Malagasy |
+| Others | Welsh · Icelandic · Maori · Hawaiian · Latin · Sanskrit · and more |
 
 ---
 
