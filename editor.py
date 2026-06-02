@@ -50,7 +50,7 @@ from PyQt6.QtWidgets import (
     QLabel, QFileDialog, QLineEdit, QRadioButton, QGroupBox,
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
     QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox, QSpinBox,
-    QDialog, QDialogButtonBox, QMenuBar,
+    QDialog, QDialogButtonBox, QMenuBar, QMenu,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QKeySequence, QShortcut, QFont, QFontDatabase, QPainter, QColor
@@ -1297,6 +1297,184 @@ class EditTextCommand(QUndoCommand):
 
 
 # ──────────────────────────────────────────────────────────────────
+# Split / Merge commands
+# ──────────────────────────────────────────────────────────────────
+
+class SplitCommand(QUndoCommand):
+    def __init__(self, srt_table, row: int, text_a: str, text_b: str, split_ms: int):
+        super().__init__(f"分割 (行 {row + 1})" if _lang == 'ja' else f"Split (row {row + 1})")
+        self.srt_table = srt_table
+        self.row       = row
+        self.text_a    = text_a
+        self.text_b    = text_b
+        self.split_ms  = split_ms
+
+    def redo(self):
+        st = self.srt_table
+        orig = st.entries[self.row]
+        entry_a = SRTEntry(orig.index,     orig.start_ms, self.split_ms, self.text_a, orig.checked)
+        entry_b = SRTEntry(orig.index + 1, self.split_ms, orig.end_ms,   self.text_b, orig.checked)
+        st.entries[self.row] = entry_a
+        st.entries.insert(self.row + 1, entry_b)
+        _reindex(st.entries)
+        st._repopulate()
+
+    def undo(self):
+        st = self.srt_table
+        orig_a = st.entries[self.row]
+        orig_b = st.entries[self.row + 1]
+        merged = SRTEntry(orig_a.index, orig_a.start_ms, orig_b.end_ms,
+                          self.text_a + (' ' if self.text_a and self.text_b else '') + self.text_b,
+                          orig_a.checked)
+        st.entries[self.row] = merged
+        del st.entries[self.row + 1]
+        _reindex(st.entries)
+        st._repopulate()
+
+
+class MergeCommand(QUndoCommand):
+    def __init__(self, srt_table, rows: List[int]):
+        super().__init__(f"統合 ({len(rows)}行)" if _lang == 'ja' else f"Merge ({len(rows)} rows)")
+        self.srt_table   = srt_table
+        self.rows        = sorted(rows)
+        # 元のエントリを保存
+        self.saved       = [srt_table.entries[r].__class__(
+                                srt_table.entries[r].index,
+                                srt_table.entries[r].start_ms,
+                                srt_table.entries[r].end_ms,
+                                srt_table.entries[r].text,
+                                srt_table.entries[r].checked)
+                            for r in self.rows]
+
+    def redo(self):
+        st    = self.srt_table
+        first = self.rows[0]
+        texts = ' '.join(st.entries[r].text for r in self.rows)
+        merged = SRTEntry(st.entries[first].index,
+                          st.entries[first].start_ms,
+                          st.entries[self.rows[-1]].end_ms,
+                          texts, st.entries[first].checked)
+        # 後ろから削除
+        for r in reversed(self.rows[1:]):
+            del st.entries[r]
+        st.entries[first] = merged
+        _reindex(st.entries)
+        st._repopulate()
+
+    def undo(self):
+        st    = self.srt_table
+        first = self.rows[0]
+        # 1行を元の複数行に戻す
+        del st.entries[first]
+        for i, e in enumerate(self.saved):
+            st.entries.insert(first + i, SRTEntry(e.index, e.start_ms, e.end_ms, e.text, e.checked))
+        _reindex(st.entries)
+        st._repopulate()
+
+
+def _reindex(entries: List['SRTEntry']):
+    for i, e in enumerate(entries):
+        e.index = i + 1
+
+
+# ──────────────────────────────────────────────────────────────────
+# Split dialog
+# ──────────────────────────────────────────────────────────────────
+
+class SplitDialog(QDialog):
+    def __init__(self, entry: 'SRTEntry', parent=None):
+        super().__init__(parent)
+        self.entry = entry
+        self.setWindowTitle('行を分割' if _lang == 'ja' else 'Split Segment')
+        self.setMinimumWidth(480)
+        self._build()
+
+    def _build(self):
+        vbox = QVBoxLayout(self)
+
+        # 説明
+        vbox.addWidget(QLabel('テキストをクリックして分割位置を選択してください。'
+                              if _lang == 'ja' else
+                              'Click in the text to choose the split point.'))
+
+        # テキスト表示（クリックで分割点を選ぶ）
+        self.txt = QTextEdit()
+        self.txt.setPlainText(self.entry.text)
+        self.txt.setMaximumHeight(80)
+        self.txt.setReadOnly(False)
+        self.txt.cursorPositionChanged.connect(self._on_cursor)
+        vbox.addWidget(self.txt)
+
+        # プレビュー
+        self.lbl_preview = QLabel('')
+        self.lbl_preview.setWordWrap(True)
+        vbox.addWidget(self.lbl_preview)
+
+        # 分割時間
+        hbox = QHBoxLayout()
+        hbox.addWidget(QLabel('分割時間:' if _lang == 'ja' else 'Split time:'))
+        self.spn_split = QDoubleSpinBox()
+        dur_sec = (self.entry.end_ms - self.entry.start_ms) / 1000
+        self.spn_split.setRange(self.entry.start_ms / 1000, self.entry.end_ms / 1000)
+        self.spn_split.setDecimals(3)
+        self.spn_split.setSingleStep(0.1)
+        mid = (self.entry.start_ms + self.entry.end_ms) / 2000
+        self.spn_split.setValue(mid)
+        self.spn_split.setSuffix(' 秒' if _lang == 'ja' else ' sec')
+        self.spn_split.valueChanged.connect(self._on_time_changed)
+        hbox.addWidget(self.spn_split)
+        hbox.addStretch()
+        vbox.addLayout(hbox)
+
+        # ボタン
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                                QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        vbox.addWidget(btns)
+
+        self._update_preview()
+
+    def _on_cursor(self):
+        cursor = self.txt.textCursor()
+        pos    = cursor.position()
+        text   = self.txt.toPlainText()
+        total  = max(len(text), 1)
+        ratio  = pos / total
+        dur_ms = self.entry.end_ms - self.entry.start_ms
+        split_ms = self.entry.start_ms + int(dur_ms * ratio)
+        self.spn_split.blockSignals(True)
+        self.spn_split.setValue(split_ms / 1000)
+        self.spn_split.blockSignals(False)
+        self._split_pos = pos
+        self._update_preview()
+
+    def _on_time_changed(self):
+        self._update_preview()
+
+    def _update_preview(self):
+        cursor = self.txt.textCursor()
+        pos    = cursor.position()
+        text   = self.txt.toPlainText()
+        part_a = text[:pos].strip()
+        part_b = text[pos:].strip()
+        t      = self.spn_split.value()
+        self.lbl_preview.setText(
+            f'前半: 「{part_a}」  ({_ms_to_srt(self.entry.start_ms)} → {_ms_to_srt(int(t*1000))})\n'
+            f'後半: 「{part_b}」  ({_ms_to_srt(int(t*1000))} → {_ms_to_srt(self.entry.end_ms)})'
+        )
+
+    def result_values(self):
+        cursor = self.txt.textCursor()
+        pos    = cursor.position()
+        text   = self.txt.toPlainText()
+        text_a = text[:pos].strip()
+        text_b = text[pos:].strip()
+        split_ms = int(self.spn_split.value() * 1000)
+        return text_a, text_b, split_ms
+
+
+# ──────────────────────────────────────────────────────────────────
 # SRT table widget
 # ──────────────────────────────────────────────────────────────────
 
@@ -1382,6 +1560,8 @@ class SRTTable(QWidget):
         self.tbl.setAlternatingRowColors(True)
         self.tbl.itemSelectionChanged.connect(self._on_sel)
         self.tbl.itemChanged.connect(self._on_changed)
+        self.tbl.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tbl.customContextMenuRequested.connect(self._on_context_menu)
         vbox.addWidget(self.tbl)
 
         # Undo / Redo ショートカット
@@ -1483,6 +1663,45 @@ class SRTTable(QWidget):
                 self.entries[row].checked = checked
         self.tbl.blockSignals(False)
         self._update_count()
+
+    def _on_context_menu(self, pos):
+        selected_rows = sorted({idx.row() for idx in self.tbl.selectedIndexes()})
+        menu = QMenu(self)
+        act_split = menu.addAction('✂ 行を分割…' if _lang == 'ja' else '✂ Split row…')
+        act_merge = menu.addAction('⊕ 選択行を統合' if _lang == 'ja' else '⊕ Merge selected rows')
+        act_split.setEnabled(len(selected_rows) == 1)
+        act_merge.setEnabled(len(selected_rows) >= 2)
+        action = menu.exec(self.tbl.viewport().mapToGlobal(pos))
+        if action == act_split and selected_rows:
+            self._split_row(selected_rows[0])
+        elif action == act_merge and len(selected_rows) >= 2:
+            self._merge_rows(selected_rows)
+
+    def _split_row(self, row: int):
+        entry = self.entries[row]
+        dlg = SplitDialog(entry, self.window())
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        text_a, text_b, split_ms = dlg.result_values()
+        if not text_a and not text_b:
+            return
+        if split_ms <= entry.start_ms or split_ms >= entry.end_ms:
+            QMessageBox.warning(self.window(),
+                'エラー' if _lang == 'ja' else 'Error',
+                '分割時間が範囲外です' if _lang == 'ja' else 'Split time is out of range.')
+            return
+        cmd = SplitCommand(self, row, text_a, text_b, split_ms)
+        self.undo_stack.push(cmd)
+
+    def _merge_rows(self, rows: List[int]):
+        # 連続行チェック
+        if rows != list(range(rows[0], rows[-1] + 1)):
+            QMessageBox.warning(self.window(),
+                'エラー' if _lang == 'ja' else 'Error',
+                '連続した行を選択してください' if _lang == 'ja' else 'Please select consecutive rows.')
+            return
+        cmd = MergeCommand(self, rows)
+        self.undo_stack.push(cmd)
 
     def _update_count(self):
         total       = len(self.entries)
