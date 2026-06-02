@@ -203,3 +203,9 @@ CPU 运行时，处理时间约为视频时长的 **3～10 倍**。
 ## 许可证
 
 可自由使用、修改和分发。
+
+---
+
+## 反馈与错误报告
+
+欢迎通过 **[GitHub Issues](https://github.com/sasakireijiyagi/video-cut-editor/issues)** 分享使用感受、改进建议或错误报告。中文、日语、英语均可。

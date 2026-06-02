@@ -204,3 +204,9 @@ This is experimental software for research and educational use. No warranty is p
 ## License
 
 Free to use, modify, and distribute.
+
+---
+
+## Feedback & Bug Reports
+
+Feel free to share how you use it, suggestions, or bug reports via **[GitHub Issues](https://github.com/sasakireijiyagi/video-cut-editor/issues)**. English or Japanese, either is fine.
