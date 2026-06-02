@@ -1912,9 +1912,14 @@ class MainWindow(QMainWindow):
         self.btn_save_srt = QPushButton(tr('save_srt'))
         self.btn_save_srt.setEnabled(False)
         self.btn_save_srt.setToolTip(tr('save_srt_tip'))
+        self.btn_close_video = QPushButton('✕')
+        self.btn_close_video.setFixedWidth(28)
+        self.btn_close_video.setEnabled(False)
+        self.btn_close_video.setToolTip('動画を閉じて初期状態に戻す' if _lang == 'ja' else 'Close video and reset')
         self.btn_video.clicked.connect(self._open_video)
         self.btn_srt.clicked.connect(self._open_srt)
         self.btn_save_srt.clicked.connect(self._save_srt)
+        self.btn_close_video.clicked.connect(self._reset)
 
         self.btn_lang = QPushButton(tr('lang_toggle'))
         self.btn_lang.setFlat(True)
@@ -1928,7 +1933,7 @@ class MainWindow(QMainWindow):
         self.btn_donate.setToolTip(tr('donate_tip'))
         self.btn_donate.clicked.connect(self._open_donate)
 
-        for w in (self.btn_video, self.lbl_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
+        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt):
             bar.addWidget(w)
         bar.addStretch()
         bar.addWidget(self.btn_lang)
@@ -2201,6 +2206,7 @@ class MainWindow(QMainWindow):
         self.btn_save_srt.setEnabled(False)
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
+        self.btn_close_video.setEnabled(True)
 
         # 縦動画判定 → レイアウト・フォントサイズを自動調整
         w, h = self._probe_size(path)
@@ -2319,6 +2325,19 @@ class MainWindow(QMainWindow):
             subprocess.Popen(['xdg-open', preview_out])
         self.log.append(f"{'Preview:' if _lang=='en' else 'プレビュー:'} {preview_out}")
 
+    def _reset(self):
+        self.video_path = None
+        self.srt_path   = None
+        self.player.player.stop()
+        self.player.load('')
+        self.srt_tbl.load([])
+        self.lbl_video.setText(tr('video_none'))
+        self.lbl_srt.setText(tr('srt_none'))
+        self.btn_save_srt.setEnabled(False)
+        self.btn_close_video.setEnabled(False)
+        self.btn_transcribe.setEnabled(False)
+        self.log.append('--- ' + ('リセットしました' if _lang == 'ja' else 'Reset.') + ' ---')
+
     def _browse_dir(self):
         d = QFileDialog.getExistingDirectory(
             self, tr('dlg_output_dir'), self.txt_dir.text())
@@ -2421,6 +2440,12 @@ class MainWindow(QMainWindow):
         fn(self, tr('done_title') if ok else tr('err_title'), msg)
 
     def _build_menu(self):
+        file_menu = self.menuBar().addMenu('ファイル' if _lang == 'ja' else 'File')
+        open_action = file_menu.addAction('動画を開く…' if _lang == 'ja' else 'Open Video…')
+        open_action.triggered.connect(self._open_video)
+        close_action = file_menu.addAction('動画を閉じる' if _lang == 'ja' else 'Close Video')
+        close_action.triggered.connect(self._reset)
+
         help_menu = self.menuBar().addMenu(tr('menu_help'))
         about_action = help_menu.addAction(tr('menu_about'))
         about_action.triggered.connect(self._show_about)
