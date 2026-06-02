@@ -1026,10 +1026,10 @@ class FillerCutDialog(QDialog):
 
         lbl = QLabel(
             '以下のテキストと完全一致するセグメントのチェックを外します。\n'
-            '1行1ワード。編集可能です。'
+            '1行1ワード。追加・削除・編集して自由にカスタマイズできます。'
             if _lang == 'ja' else
             'Uncheck segments that exactly match the words below.\n'
-            'One word per line. Editable.'
+            'One word per line. You can add, delete, or edit to customize the list.'
         )
         lbl.setWordWrap(True)
         vbox.addWidget(lbl)

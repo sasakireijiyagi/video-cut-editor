@@ -116,7 +116,7 @@ Click "🎙 Transcribe". When done, segments appear in the table on the right.
 - **Right-click → Merge selected rows** — select consecutive rows and merge into one
 - All edits support **Ctrl+Z** undo / **Ctrl+Y** redo
 - **Ctrl+H** opens Find & Replace
-- **✂ Filler Cut** removes filler words in one click
+- **✂ Filler Cut** removes filler words in one click — list is fully customizable
 - **Save SRT** overwrites the original SRT file with your edits
 
 **④ Uncheck unwanted segments**  
