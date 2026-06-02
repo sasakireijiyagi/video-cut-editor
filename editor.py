@@ -337,7 +337,15 @@ _LANG_MAP = {
     'English': 'en',
     '中文': 'zh',
     '한국어': 'ko',
-    '自動検出': 'auto',
+    'Español': 'es',
+    'Français': 'fr',
+    'Deutsch': 'de',
+    'Português': 'pt',
+    'Italiano': 'it',
+    'Русский': 'ru',
+    'العربية': 'ar',
+    'Hindi हिन्दी': 'hi',
+    '自動検出 / Auto': 'auto',
 }
 
 
