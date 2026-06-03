@@ -1716,6 +1716,10 @@ class SRTTable(QWidget):
         QShortcut(QKeySequence('X'), self).activated.connect(self._toggle_check)
         QShortcut(QKeySequence('Down'), self).activated.connect(self._next_row)
         QShortcut(QKeySequence('Up'), self).activated.connect(self._prev_row)
+        QShortcut(QKeySequence('Z'), self).activated.connect(self._merge_prev)
+        QShortcut(QKeySequence('C'), self).activated.connect(self._merge_next)
+        QShortcut(QKeySequence('S'), self).activated.connect(lambda: self._split_row(self.tbl.currentRow()))
+        QShortcut(QKeySequence('D'), self).activated.connect(self._enter_edit_mode)
 
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
@@ -1788,6 +1792,27 @@ class SRTTable(QWidget):
             if old_text != new_text:
                 cmd = EditTextCommand(self, row, old_text, new_text)
                 self.undo_stack.push(cmd)
+
+    def _enter_edit_mode(self):
+        row = self.tbl.currentRow()
+        if row < 0 or row >= len(self.entries):
+            return
+        item = self.tbl.item(row, 3)
+        if item:
+            self.tbl.setCurrentItem(item)
+            self.tbl.editItem(item)
+
+    def _merge_prev(self):
+        row = self.tbl.currentRow()
+        if row <= 0 or row >= len(self.entries):
+            return
+        self._merge_rows([row - 1, row])
+
+    def _merge_next(self):
+        row = self.tbl.currentRow()
+        if row < 0 or row >= len(self.entries) - 1:
+            return
+        self._merge_rows([row, row + 1])
 
     def _toggle_check(self):
         row = self.tbl.currentRow()
