@@ -18,26 +18,6 @@
 
 ---
 
-## デモ動画
-
-### 入門版（初めての方へ）
-https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/promo_beginner.mp4
-
-### 技術版（whisper / ffmpeg / SRT を知っている方へ）
-https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/promo_technical.mp4
-
----
-
-## インストール手順動画
-
-### Mac版
-https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/setup_mac_detailed.mp4
-
-### Windows版
-https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/setup_win_detailed.mp4
-
----
-
 ## 主な機能
 
 - **文字起こし**：[OpenAI Whisper](https://github.com/openai/whisper) で講義・会議動画を自動転写 — **100言語対応**
