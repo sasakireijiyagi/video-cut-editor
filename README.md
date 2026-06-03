@@ -21,20 +21,20 @@
 ## デモ動画
 
 ### 入門版（初めての方へ）
-<video src="promo_beginner.mp4" controls width="100%"></video>
+https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/promo_beginner.mp4
 
 ### 技術版（whisper / ffmpeg / SRT を知っている方へ）
-<video src="promo_technical.mp4" controls width="100%"></video>
+https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/promo_technical.mp4
 
 ---
 
 ## インストール手順動画
 
 ### Mac版
-<video src="setup_mac_detailed.mp4" controls width="100%"></video>
+https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/setup_mac_detailed.mp4
 
 ### Windows版
-<video src="setup_win_detailed.mp4" controls width="100%"></video>
+https://github.com/sasakireijiyagi/video-cut-editor/releases/download/v1.0.1/setup_win_detailed.mp4
 
 ---
 
