@@ -18,6 +18,26 @@
 
 ---
 
+## デモ動画
+
+### 入門版（初めての方へ）
+![intro](promo_beginner.mp4)
+
+### 技術版（whisper / ffmpeg / SRT を知っている方へ）
+![technical](promo_technical.mp4)
+
+---
+
+## インストール手順動画
+
+### Mac版
+![setup mac](setup_mac_detailed.mp4)
+
+### Windows版
+![setup win](setup_win_detailed.mp4)
+
+---
+
 ## 主な機能
 
 - **文字起こし**：[OpenAI Whisper](https://github.com/openai/whisper) で講義・会議動画を自動転写 — **100言語対応**
