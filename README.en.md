@@ -170,9 +170,23 @@ Click **"📂 Batch Transcription"** to transcribe multiple videos at once.
 
 ## Keyboard shortcuts
 
+**SRT table**
+
+| Key | Action |
+|-----|--------|
+| ↓ / ↑ | Move to next/previous row and play |
+| X | Toggle check on current row |
+| D | Enter text edit mode |
+| Escape | Exit edit mode |
+| S | Open split dialog |
+| Z | Merge with previous row |
+| C | Merge with next row |
+
+**General**
+
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Z | Undo (text / time edits) |
+| Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
 | Ctrl+H | Open Find & Replace |
 
