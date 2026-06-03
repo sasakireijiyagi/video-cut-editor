@@ -954,6 +954,8 @@ class BatchDialog(QDialog):
         self.btn_cancel.setEnabled(True)
         self.btn_remove.setEnabled(False)
         self.btn_clear.setEnabled(False)
+        self._batch_start_time = None
+        self._file_start_time  = None
         self._worker.start()
 
     def _cancel(self):
@@ -962,16 +964,38 @@ class BatchDialog(QDialog):
         self.btn_cancel.setEnabled(False)
 
     def _on_file_started(self, current: int, total: int, name: str):
+        import time
         self.progress.setRange(0, total)
+        if self._batch_start_time is None:
+            self._batch_start_time = time.time()
+        self._file_start_time = time.time()
         label = (f'処理中 [{current}/{total}]: {name}'
                  if _lang == 'ja' else f'Processing [{current}/{total}]: {name}')
         self.lbl_current.setText(label)
         self.log.append(f"\n[{current}/{total}] {name}")
 
     def _on_file_done(self, current: int, total: int, ok: bool, msg: str):
+        import time
         self.progress.setValue(current)
         status = '✓' if ok else '✗'
         self.log.append(f"  {status} {msg}")
+
+        # 残り時間を推定
+        if self._batch_start_time and current > 0:
+            elapsed   = time.time() - self._batch_start_time
+            avg_per   = elapsed / current
+            remaining = avg_per * (total - current)
+            if remaining >= 3600:
+                r_str = f'{int(remaining//3600)}時間{int((remaining%3600)//60)}分' if _lang == 'ja' else f'{int(remaining//3600)}h {int((remaining%3600)//60)}m'
+            elif remaining >= 60:
+                r_str = f'約{int(remaining//60)}分' if _lang == 'ja' else f'~{int(remaining//60)} min'
+            else:
+                r_str = f'約{int(remaining)}秒' if _lang == 'ja' else f'~{int(remaining)} sec'
+
+            if current < total:
+                eta = f'  残り推定: {r_str}' if _lang == 'ja' else f'  Est. remaining: {r_str}'
+                current_text = self.lbl_current.text().split('  残り')[0].split('  Est.')[0]
+                self.lbl_current.setText(current_text + eta)
 
     def _on_all_done(self, success: int, total: int):
         self.btn_start.setEnabled(True)
