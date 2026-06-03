@@ -21,20 +21,20 @@
 ## デモ動画
 
 ### 入門版（初めての方へ）
-![intro](promo_beginner.mp4)
+<video src="promo_beginner.mp4" controls width="100%"></video>
 
 ### 技術版（whisper / ffmpeg / SRT を知っている方へ）
-![technical](promo_technical.mp4)
+<video src="promo_technical.mp4" controls width="100%"></video>
 
 ---
 
 ## インストール手順動画
 
 ### Mac版
-![setup mac](setup_mac_detailed.mp4)
+<video src="setup_mac_detailed.mp4" controls width="100%"></video>
 
 ### Windows版
-![setup win](setup_win_detailed.mp4)
+<video src="setup_win_detailed.mp4" controls width="100%"></video>
 
 ---
 
