@@ -1712,6 +1712,11 @@ class SRTTable(QWidget):
         QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self.undo_stack.undo)
         QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self.undo_stack.redo)
 
+        # 再生・チェック操作ショートカット
+        QShortcut(QKeySequence('X'), self).activated.connect(self._toggle_check)
+        QShortcut(QKeySequence('Down'), self).activated.connect(self._next_row)
+        QShortcut(QKeySequence('Up'), self).activated.connect(self._prev_row)
+
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
         self.btn_none.setText(tr('deselect_all'))
@@ -1783,6 +1788,31 @@ class SRTTable(QWidget):
             if old_text != new_text:
                 cmd = EditTextCommand(self, row, old_text, new_text)
                 self.undo_stack.push(cmd)
+
+    def _toggle_check(self):
+        row = self.tbl.currentRow()
+        if row < 0 or row >= len(self.entries):
+            return
+        entry = self.entries[row]
+        entry.checked = not entry.checked
+        self.tbl.blockSignals(True)
+        item = self.tbl.item(row, 0)
+        if item:
+            item.setCheckState(Qt.CheckState.Checked if entry.checked else Qt.CheckState.Unchecked)
+        self.tbl.blockSignals(False)
+        self._update_count()
+
+    def _next_row(self):
+        row = self.tbl.currentRow()
+        next_row = min(row + 1, self.tbl.rowCount() - 1)
+        self.tbl.setCurrentCell(next_row, 0)
+        self.row_activated.emit(next_row)
+
+    def _prev_row(self):
+        row = self.tbl.currentRow()
+        prev_row = max(row - 1, 0)
+        self.tbl.setCurrentCell(prev_row, 0)
+        self.row_activated.emit(prev_row)
 
     def _nudge(self, col: int, direction: int):
         row = self.tbl.currentRow()
