@@ -2878,8 +2878,27 @@ def main():
     splash = SplashScreen(font_id)
     win    = MainWindow()
 
+    def _apply_default_geometry():
+        # macOSが前回の最大化状態を復元するため、明示的に「ちょうどいい」サイズへ戻す
+        win.setWindowState(win.windowState() & ~Qt.WindowState.WindowMaximized)
+        w, h = 1180, 720
+        scr = app.primaryScreen()
+        if scr is not None:
+            geo = scr.availableGeometry()
+            w = min(w, geo.width())
+            h = min(h, geo.height())
+            win.resize(w, h)
+            fg = win.frameGeometry()
+            fg.moveCenter(geo.center())
+            win.move(fg.topLeft())
+        else:
+            win.resize(w, h)
+
     def _show_main():
         win.show()
+        _apply_default_geometry()
+        # 復元がshow直後に走ることがあるため、イベントループ後にもう一度適用
+        QTimer.singleShot(150, _apply_default_geometry)
 
     splash.finished.connect(_show_main)
     splash.start()
