@@ -1991,10 +1991,11 @@ class VideoPlayer(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
 
         self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumSize(400, 280)
+        # 最小高さを抑えめにして、下の再生コントロールが必ず見えるようにする
+        self.video_widget.setMinimumSize(320, 160)
         self.video_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        vbox.addWidget(self.video_widget)
+        vbox.addWidget(self.video_widget, stretch=1)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 0)
@@ -2009,6 +2010,9 @@ class VideoPlayer(QWidget):
         self.btn_play  = QPushButton(tr('play'))
         self.btn_pause = QPushButton(tr('pause'))
         self.btn_stop  = QPushButton(tr('stop'))
+        # コントロールバーは縮まないよう固定高さを確保
+        for b in (self.btn_play, self.btn_pause, self.btn_stop):
+            b.setMinimumHeight(30)
         self.btn_play.clicked.connect(self._play)
         self.btn_pause.clicked.connect(self._pause)
         self.btn_stop.clicked.connect(self._stop)
