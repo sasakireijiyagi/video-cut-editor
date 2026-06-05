@@ -2003,11 +2003,10 @@ class VideoPlayer(QWidget):
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         vbox.addWidget(self.video_widget)
 
-        self.lbl_seg = QLabel("")
-        self.lbl_seg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_seg.setWordWrap(True)
-        self.lbl_seg.setStyleSheet("color: #555; font-size: 11px;")
-        vbox.addWidget(self.lbl_seg)
+        # セグメント文字表示は画面に出さない（時刻は再生バー、本文は右の表に表示）
+        # レイアウトに加えないことで動画が下までいっぱいになり、右のSRT表と下辺が揃う
+        self.lbl_seg = QLabel("", self)
+        self.lbl_seg.setVisible(False)
 
         # 再生コントロールは1つのウィジェットにまとめ、右側のSRT表の上に配置する
         # （動画の下に置くと縦が詰まったとき隠れてしまうため）
