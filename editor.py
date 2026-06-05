@@ -1991,11 +1991,10 @@ class VideoPlayer(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
 
         self.video_widget = QVideoWidget()
-        # 最小高さを抑えめにして、下の再生コントロールが必ず見えるようにする
-        self.video_widget.setMinimumSize(320, 160)
+        self.video_widget.setMinimumSize(400, 280)
         self.video_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        vbox.addWidget(self.video_widget, stretch=1)
+        vbox.addWidget(self.video_widget)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 0)
@@ -2010,9 +2009,6 @@ class VideoPlayer(QWidget):
         self.btn_play  = QPushButton(tr('play'))
         self.btn_pause = QPushButton(tr('pause'))
         self.btn_stop  = QPushButton(tr('stop'))
-        # コントロールバーは縮まないよう固定高さを確保
-        for b in (self.btn_play, self.btn_pause, self.btn_stop):
-            b.setMinimumHeight(30)
         self.btn_play.clicked.connect(self._play)
         self.btn_pause.clicked.connect(self._pause)
         self.btn_stop.clicked.connect(self._stop)
@@ -2878,27 +2874,8 @@ def main():
     splash = SplashScreen(font_id)
     win    = MainWindow()
 
-    def _apply_default_geometry():
-        # macOSが前回の最大化状態を復元するため、明示的に「ちょうどいい」サイズへ戻す
-        win.setWindowState(win.windowState() & ~Qt.WindowState.WindowMaximized)
-        w, h = 1180, 720
-        scr = app.primaryScreen()
-        if scr is not None:
-            geo = scr.availableGeometry()
-            w = min(w, geo.width())
-            h = min(h, geo.height())
-            win.resize(w, h)
-            fg = win.frameGeometry()
-            fg.moveCenter(geo.center())
-            win.move(fg.topLeft())
-        else:
-            win.resize(w, h)
-
     def _show_main():
         win.show()
-        _apply_default_geometry()
-        # 復元がshow直後に走ることがあるため、イベントループ後にもう一度適用
-        QTimer.singleShot(150, _apply_default_geometry)
 
     splash.finished.connect(_show_main)
     splash.start()
