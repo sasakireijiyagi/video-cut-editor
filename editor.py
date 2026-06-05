@@ -2881,6 +2881,15 @@ def main():
 
     def _show_main():
         win.show()
+        # macOSのウィンドウ復元がshow後に前回サイズを戻すことがあるため、
+        # show後に改めてサイズを適用して画面中央に配置する
+        win.resize(1440, 920)
+        scr = app.primaryScreen()
+        if scr is not None:
+            geo = scr.availableGeometry()
+            fg  = win.frameGeometry()
+            fg.moveCenter(geo.center())
+            win.move(fg.topLeft())
 
     splash.finished.connect(_show_main)
     splash.start()
