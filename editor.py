@@ -975,8 +975,7 @@ class BatchDialog(QDialog):
             self.file_list.addItem(p)
         if new_paths and self._worker and self._worker.isRunning():
             self._worker.add_files(new_paths)
-            n = self.file_list.count()
-            self.progress.setRange(0, n)
+            self.progress.setRange(0, 0)   # 不確定モードを維持
 
     def _remove_selected(self):
         for item in self.file_list.selectedItems():
@@ -1003,8 +1002,7 @@ class BatchDialog(QDialog):
         self._worker.log.connect(self.log.append)
         self._worker.all_done.connect(self._on_all_done)
 
-        self.progress.setRange(0, len(files))
-        self.progress.setValue(0)
+        self.progress.setRange(0, 0)   # 不確定モード（処理中アニメーション）
         self.progress.setVisible(True)
         self.lbl_current.setVisible(True)
         self.btn_start.setEnabled(False)
@@ -1022,7 +1020,7 @@ class BatchDialog(QDialog):
 
     def _on_file_started(self, current: int, total: int, name: str):
         import time
-        self.progress.setRange(0, total)
+        self.progress.setRange(0, 0)   # 不確定モード（処理中アニメーション）
         if self._batch_start_time is None:
             self._batch_start_time = time.time()
         self._file_start_time = time.time()
@@ -1033,7 +1031,6 @@ class BatchDialog(QDialog):
 
     def _on_file_done(self, current: int, total: int, ok: bool, msg: str):
         import time
-        self.progress.setValue(current)
         status = '✓' if ok else '✗'
         self.log.append(f"  {status} {msg}")
 
@@ -1059,6 +1056,9 @@ class BatchDialog(QDialog):
         self.btn_cancel.setEnabled(False)
         self.btn_remove.setEnabled(True)
         self.btn_clear.setEnabled(True)
+        # 不確定モードを止めて完了状態（満杯）に
+        self.progress.setRange(0, 1)
+        self.progress.setValue(1)
         self.lbl_current.setVisible(False)
         msg = (f"完了: {success}/{total} ファイル処理しました"
                if _lang == 'ja' else f"Done: {success}/{total} files processed.")
