@@ -155,11 +155,13 @@ Check **"Burn subtitles"** in the output settings to embed subtitles directly in
 
 > **⚠️ ffmpeg libass requirement**  
 > Subtitle burning requires an **ffmpeg built with libass**. Homebrew's default `ffmpeg` (recent versions) no longer bundles libass, so subtitle burning alone may fail.  
-> If so, install a libass-enabled build:  
+> If so, install the homebrew-ffmpeg build (libass is enabled by default):  
 > ```
 > brew tap homebrew-ffmpeg/ffmpeg
-> brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+> brew unlink ffmpeg
+> brew install homebrew-ffmpeg/ffmpeg/ffmpeg
 > ```  
+> Verify with `ffmpeg -hide_banner -filters | grep subtitles` — the `subtitles` line should appear.  
 > All other features (transcription, cutting, EAF export) work fine without libass.
 
 ---

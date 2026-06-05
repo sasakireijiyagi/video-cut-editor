@@ -179,11 +179,13 @@ Dock に追加しておくと便利です。
 
 > **⚠️ ffmpeg の libass について**  
 > 字幕焼き込みには **libass を含む ffmpeg** が必要です。Homebrew の標準 `ffmpeg`（最近のバージョン）は libass を同梱していないため、字幕焼き込みだけ動かない場合があります。  
-> その場合は libass 入りのビルドを導入してください:  
+> その場合は homebrew-ffmpeg 版を導入してください（libass は標準で有効）:  
 > ```
 > brew tap homebrew-ffmpeg/ffmpeg
-> brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+> brew unlink ffmpeg
+> brew install homebrew-ffmpeg/ffmpeg/ffmpeg
 > ```  
+> 導入後に `ffmpeg -hide_banner -filters | grep subtitles` で `subtitles` 行が出れば成功です。  
 > 文字起こし・カット・EAF書き出しなど他の機能は libass なしでも問題なく使えます。
 
 ---
