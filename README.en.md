@@ -150,7 +150,7 @@ Check **"Burn subtitles"** in the output settings to embed subtitles directly in
 
 - Font: bold Gothic (Hiragino Kaku Gothic ProN on Mac)
 - Style: white text, black outline, bottom-center
-- Font size is adjustable (default 52px landscape / 36px portrait)
+- Font size is adjustable (default 40px landscape / 36px portrait)
 - **▶ Preview** renders just the selected segment so you can check before exporting
 
 > **⚠️ ffmpeg libass requirement**  

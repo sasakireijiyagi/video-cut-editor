@@ -459,7 +459,7 @@ class FFmpegWorker(QThread):
     # ── 字幕フィルタ文字列を生成 ──
     def _subtitle_vf(self, srt_path: str) -> str:
         font = self.font_name.strip() if self.font_name.strip() else self._pick_font()
-        size = self.font_size if self.font_size > 0 else 52
+        size = self.font_size if self.font_size > 0 else 40
         # ASSスタイルをffmpegのforce_styleで指定
         # Alignment=2: 下中央, BorderStyle=1: 縁取り, Outline=4, Shadow=0
         style = (
@@ -2241,7 +2241,7 @@ class MainWindow(QMainWindow):
         lbl_fsize = QLabel('フォントサイズ:' if _lang == 'ja' else 'Font size:')
         self.spn_font_size = QSpinBox()
         self.spn_font_size.setRange(20, 120)
-        self.spn_font_size.setValue(52)
+        self.spn_font_size.setValue(40)
         self.spn_font_size.setSuffix(' px')
         self.spn_font_size.setToolTip('0にすると自動' if _lang == 'ja' else 'Auto if 0')
 
@@ -2453,7 +2453,7 @@ class MainWindow(QMainWindow):
         else:
             self.spl.setOrientation(Qt.Orientation.Horizontal)
             self.spl.setSizes([500, 600])
-            self.spn_font_size.setValue(52)
+            self.spn_font_size.setValue(40)
 
         for ext in ('.srt', '.SRT'):
             candidate = Path(path).with_suffix(ext)
