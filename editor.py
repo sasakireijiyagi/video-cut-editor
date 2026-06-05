@@ -2091,8 +2091,7 @@ class MainWindow(QMainWindow):
         self.worker: Optional[FFmpegWorker] = None
         self.whisper_worker: Optional[WhisperWorker] = None
         self.setWindowTitle(tr('window_title'))
-        self.setMinimumSize(1000, 640)
-        self.resize(1440, 920)   # 起動時のデフォルトサイズを大きめに
+        self.setMinimumSize(1100, 700)
         self._build()
         self._build_menu()
         QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
@@ -2881,10 +2880,6 @@ def main():
 
     def _show_main():
         win.show()
-        # 画面に合わせて最大化（小型・縦の短い共有ディスプレイでも画面いっぱいに）
-        win.showMaximized()
-        # macOSの復元がshow直後にサイズを戻すことがあるため、遅延でもう一度
-        QTimer.singleShot(120, win.showMaximized)
 
     splash.finished.connect(_show_main)
     splash.start()
