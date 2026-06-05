@@ -2091,7 +2091,8 @@ class MainWindow(QMainWindow):
         self.worker: Optional[FFmpegWorker] = None
         self.whisper_worker: Optional[WhisperWorker] = None
         self.setWindowTitle(tr('window_title'))
-        self.setMinimumSize(1100, 700)
+        self.setMinimumSize(1000, 640)
+        self.resize(1440, 920)   # 起動時のデフォルトサイズを大きめに
         self._build()
         self._build_menu()
         QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
