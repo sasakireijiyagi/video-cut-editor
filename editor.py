@@ -319,6 +319,51 @@ def _find_whisper() -> str:
 FFMPEG_BIN  = _find_ffmpeg()
 WHISPER_BIN = _find_whisper()
 
+_SUBTITLES_FILTER_CACHE = None
+
+def _ffmpeg_has_subtitles() -> bool:
+    """ffmpeg に subtitles フィルタ（libass）が含まれているか判定（結果をキャッシュ）"""
+    global _SUBTITLES_FILTER_CACHE
+    if _SUBTITLES_FILTER_CACHE is not None:
+        return _SUBTITLES_FILTER_CACHE
+    try:
+        env = os.environ.copy()
+        if sys.platform != 'win32':
+            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        r = subprocess.run([FFMPEG_BIN, '-hide_banner', '-filters'],
+                           capture_output=True, text=True, timeout=15, env=env)
+        # "subtitles" フィルタ行を探す（行頭フラグの後にフィルタ名が来る）
+        import re as _re
+        found = bool(_re.search(r'\bsubtitles\b\s+\S+->\S+', r.stdout))
+        _SUBTITLES_FILTER_CACHE = found
+    except Exception:
+        _SUBTITLES_FILTER_CACHE = False
+    return _SUBTITLES_FILTER_CACHE
+
+
+def _subtitle_unavailable_msg() -> str:
+    if _lang == 'en':
+        return (
+            "Subtitle burning requires an ffmpeg built with libass, "
+            "but the current ffmpeg does not include it.\n\n"
+            "On macOS (Homebrew's default ffmpeg no longer bundles libass), install a full build:\n"
+            "    brew install ffmpeg\n"
+            "  → if that still lacks libass, use a static full build, e.g.:\n"
+            "    brew tap homebrew-ffmpeg/ffmpeg\n"
+            "    brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass\n\n"
+            "All other features (transcription, cutting, EAF export) work without libass."
+        )
+    return (
+        "字幕焼き込みには libass を含む ffmpeg が必要ですが、"
+        "現在の ffmpeg には含まれていません。\n\n"
+        "macOS の場合（Homebrew の標準 ffmpeg は libass を同梱しなくなりました）、"
+        "libass 入りのビルドを導入してください:\n"
+        "    brew tap homebrew-ffmpeg/ffmpeg\n"
+        "    brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass\n\n"
+        "※ 字幕焼き込み以外の機能（文字起こし・カット・EAF書き出し等）は\n"
+        "  libass がなくても問題なく使えます。"
+    )
+
 DEFAULT_FILLERS = [
     'えー', 'えーと', 'えっと', 'えと',
     'あー', 'あーと', 'あの', 'あのー', 'あのう',
@@ -453,6 +498,15 @@ class FFmpegWorker(QThread):
         checked = [e for e in self.entries if e.checked]
         if not checked:
             self.done.emit(False, "No segments selected." if _lang == 'en' else "選択されたセグメントがありません")
+            return
+
+        # 字幕焼き込み要求時、ffmpegにsubtitlesフィルタが無ければ中断
+        if self.subtitle_burn and not _ffmpeg_has_subtitles():
+            self.done.emit(False,
+                'ffmpeg does not support subtitle burning (libass missing).'
+                if _lang == 'en' else
+                '字幕焼き込み非対応のffmpegです（libass無し）。詳細はログ参照。')
+            self.log.emit(_subtitle_unavailable_msg())
             return
 
         # 重複除去
@@ -2199,6 +2253,12 @@ class MainWindow(QMainWindow):
             lbl_font.setEnabled(checked)
             self.txt_font.setEnabled(checked)
             self.btn_sub_preview.setEnabled(checked)
+            # オンにした瞬間、ffmpegが字幕焼き込み非対応なら即警告
+            if checked and not _ffmpeg_has_subtitles():
+                QMessageBox.warning(
+                    self,
+                    '字幕焼き込み非対応のffmpeg' if _lang == 'ja' else 'ffmpeg without subtitle support',
+                    _subtitle_unavailable_msg())
         self.chk_burn_sub.toggled.connect(_toggle_sub_ui)
         _toggle_sub_ui(False)
 
@@ -2446,6 +2506,12 @@ class MainWindow(QMainWindow):
         if row < 0 or row >= len(entries):
             QMessageBox.warning(self, tr('err_title'),
                 '行を選択してください' if _lang == 'ja' else 'Please select a row.')
+            return
+        if not _ffmpeg_has_subtitles():
+            QMessageBox.warning(
+                self,
+                '字幕焼き込み非対応のffmpeg' if _lang == 'ja' else 'ffmpeg without subtitle support',
+                _subtitle_unavailable_msg())
             return
         entry = entries[row]
         import tempfile

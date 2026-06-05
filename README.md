@@ -177,6 +177,15 @@ Dock に追加しておくと便利です。
 
 > 字幕焼き込みは常に再エンコードになります（「再エンコード」チェックの有無に関わらず）。
 
+> **⚠️ ffmpeg の libass について**  
+> 字幕焼き込みには **libass を含む ffmpeg** が必要です。Homebrew の標準 `ffmpeg`（最近のバージョン）は libass を同梱していないため、字幕焼き込みだけ動かない場合があります。  
+> その場合は libass 入りのビルドを導入してください:  
+> ```
+> brew tap homebrew-ffmpeg/ffmpeg
+> brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+> ```  
+> 文字起こし・カット・EAF書き出しなど他の機能は libass なしでも問題なく使えます。
+
 ---
 
 ## 縦動画への対応

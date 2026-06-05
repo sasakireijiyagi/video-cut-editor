@@ -153,6 +153,15 @@ Check **"Burn subtitles"** in the output settings to embed subtitles directly in
 - Font size is adjustable (default 52px landscape / 36px portrait)
 - **▶ Preview** renders just the selected segment so you can check before exporting
 
+> **⚠️ ffmpeg libass requirement**  
+> Subtitle burning requires an **ffmpeg built with libass**. Homebrew's default `ffmpeg` (recent versions) no longer bundles libass, so subtitle burning alone may fail.  
+> If so, install a libass-enabled build:  
+> ```
+> brew tap homebrew-ffmpeg/ffmpeg
+> brew install homebrew-ffmpeg/ffmpeg/ffmpeg --with-libass
+> ```  
+> All other features (transcription, cutting, EAF export) work fine without libass.
+
 ---
 
 ## Batch transcription
