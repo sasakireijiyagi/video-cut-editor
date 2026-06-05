@@ -1688,9 +1688,15 @@ class SRTTable(QWidget):
         self.undo_stack = QUndoStack(self)
         self._build()
 
+    def insert_playback_controls(self, widget):
+        """再生コントロールを「全選択」行と「ステップ」行の間に差し込む"""
+        # vbox の index: 0=bar(全選択行), 1=nudge_bar(ステップ行)...
+        self._vbox.insertWidget(1, widget)
+
     def _build(self):
         vbox = QVBoxLayout(self)
         vbox.setContentsMargins(0, 0, 0, 0)
+        self._vbox = vbox
 
         bar = QHBoxLayout()
         self.btn_all  = QPushButton(tr('select_all'))
@@ -1991,37 +1997,37 @@ class VideoPlayer(QWidget):
         vbox.setContentsMargins(0, 0, 0, 0)
 
         self.video_widget = QVideoWidget()
-        self.video_widget.setMinimumSize(400, 280)
+        self.video_widget.setMinimumSize(400, 240)
         self.video_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         vbox.addWidget(self.video_widget)
-
-        self.slider = QSlider(Qt.Orientation.Horizontal)
-        self.slider.setRange(0, 0)
-        self.slider.sliderMoved.connect(self._seek)
-        vbox.addWidget(self.slider)
-
-        self.lbl_time = QLabel("--:--:-- / --:--:--")
-        self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        vbox.addWidget(self.lbl_time)
-
-        bar = QHBoxLayout()
-        self.btn_play  = QPushButton(tr('play'))
-        self.btn_pause = QPushButton(tr('pause'))
-        self.btn_stop  = QPushButton(tr('stop'))
-        self.btn_play.clicked.connect(self._play)
-        self.btn_pause.clicked.connect(self._pause)
-        self.btn_stop.clicked.connect(self._stop)
-        for b in (self.btn_play, self.btn_pause, self.btn_stop):
-            bar.addWidget(b)
-        bar.addStretch()
-        vbox.addLayout(bar)
 
         self.lbl_seg = QLabel("")
         self.lbl_seg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_seg.setWordWrap(True)
         self.lbl_seg.setStyleSheet("color: #555; font-size: 11px;")
         vbox.addWidget(self.lbl_seg)
+
+        # 再生コントロールは1つのウィジェットにまとめ、右側のSRT表の上に配置する
+        # （動画の下に置くと縦が詰まったとき隠れてしまうため）
+        self.controls_widget = QWidget()
+        cbar = QHBoxLayout(self.controls_widget)
+        cbar.setContentsMargins(0, 0, 0, 0)
+        self.btn_play  = QPushButton(tr('play'))
+        self.btn_pause = QPushButton(tr('pause'))
+        self.btn_stop  = QPushButton(tr('stop'))
+        self.btn_play.clicked.connect(self._play)
+        self.btn_pause.clicked.connect(self._pause)
+        self.btn_stop.clicked.connect(self._stop)
+        self.lbl_time = QLabel("--:--:-- / --:--:--")
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setRange(0, 0)
+        self.slider.sliderMoved.connect(self._seek)
+        cbar.addWidget(self.btn_play)
+        cbar.addWidget(self.btn_pause)
+        cbar.addWidget(self.btn_stop)
+        cbar.addWidget(self.lbl_time)
+        cbar.addWidget(self.slider, stretch=1)
 
     def retranslate(self):
         self.btn_play.setText(tr('play'))
@@ -2202,6 +2208,9 @@ class MainWindow(QMainWindow):
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
         self.spl.addWidget(self.srt_tbl)
+
+        # 再生コントロールを右側（全選択行とステップ行の間）に配置
+        self.srt_tbl.insert_playback_controls(self.player.controls_widget)
 
         self.spl.setSizes([500, 600])
         vbox.addWidget(self.spl, stretch=1)
