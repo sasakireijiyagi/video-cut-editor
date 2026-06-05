@@ -1696,6 +1696,7 @@ class SRTTable(QWidget):
     def _build(self):
         vbox = QVBoxLayout(self)
         vbox.setContentsMargins(0, 0, 0, 0)
+        vbox.setSpacing(2)          # 全選択/再生/ステップ各行の行間を詰める
         self._vbox = vbox
 
         bar = QHBoxLayout()
@@ -2218,6 +2219,8 @@ class MainWindow(QMainWindow):
         # ── 出力設定 ──────────────────────────────────
         self.grp_output = QGroupBox(tr('output_group'))
         gv = QVBoxLayout(self.grp_output)
+        gv.setContentsMargins(10, 6, 10, 6)   # 出力設定の上下余白を詰める
+        gv.setSpacing(4)
 
         r1 = QHBoxLayout()
         self.rb_combine   = QRadioButton(tr('combine'))
