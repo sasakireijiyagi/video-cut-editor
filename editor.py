@@ -2879,17 +2879,26 @@ def main():
     splash = SplashScreen(font_id)
     win    = MainWindow()
 
-    def _show_main():
-        win.show()
-        # macOSのウィンドウ復元がshow後に前回サイズを戻すことがあるため、
-        # show後に改めてサイズを適用して画面中央に配置する
-        win.resize(1440, 920)
+    def _fit_window():
+        # 画面サイズに合わせてウィンドウサイズを決める（小さい共有ディスプレイ対策）
         scr = app.primaryScreen()
         if scr is not None:
             geo = scr.availableGeometry()
-            fg  = win.frameGeometry()
+            w = min(1440, int(geo.width()  * 0.92))
+            h = min(920,  int(geo.height() * 0.92))
+            win.resize(w, h)
+            fg = win.frameGeometry()
             fg.moveCenter(geo.center())
             win.move(fg.topLeft())
+        else:
+            win.resize(1440, 920)
+
+    def _show_main():
+        win.show()
+        _fit_window()
+        # macOSのウィンドウ復元がshow直後に前回サイズを戻すことがあるため、
+        # イベントループ処理後にもう一度サイズを適用して確実にする
+        QTimer.singleShot(120, _fit_window)
 
     splash.finished.connect(_show_main)
     splash.start()
