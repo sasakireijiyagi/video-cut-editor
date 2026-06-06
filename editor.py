@@ -722,6 +722,7 @@ class BatchWhisperWorker(QThread):
     file_done     = pyqtSignal(int, int, bool, str)  # current, total, ok, msg
     log           = pyqtSignal(str)
     all_done      = pyqtSignal(int, int)        # success_count, total
+    seg_tick      = pyqtSignal()                # whisperが1区間出力するたび（進捗の鼓動）
 
     def __init__(self, files: List[str], model: str, language: str,
                  mark_silence: bool, silence_sec: float):
@@ -776,6 +777,8 @@ class BatchWhisperWorker(QThread):
                     line = line.rstrip()
                     if line:
                         self.log.emit(line)
+                        if '-->' in line:        # whisperの区間出力行＝進捗の鼓動
+                            self.seg_tick.emit()
                 self._proc.wait()
             except Exception as exc:
                 self.file_done.emit(i + 1, total, False, str(exc))
@@ -919,6 +922,17 @@ class BatchDialog(QDialog):
 
         self.progress = QProgressBar()
         self.progress.setVisible(False)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(6)
+        self.progress.setRange(0, 1000)
+        # 淡い色の細いバーが、実際の進み具合に合わせてじわっと前進するだけ
+        self.progress.setStyleSheet(
+            "QProgressBar { border: none; border-radius: 3px; background: #e8e8e8; }"
+            "QProgressBar::chunk { border-radius: 3px; background: #a9c0d8; }"
+        )
+        self._cur_file  = 0
+        self._cur_total = 1
+        self._creep     = 0.0
         vbox.addWidget(self.progress)
 
         self.log = QTextEdit()
@@ -975,7 +989,8 @@ class BatchDialog(QDialog):
             self.file_list.addItem(p)
         if new_paths and self._worker and self._worker.isRunning():
             self._worker.add_files(new_paths)
-            self.progress.setRange(0, 0)   # 不確定モードを維持
+            self._cur_total = self.file_list.count()
+            self._update_progress()
 
     def _remove_selected(self):
         for item in self.file_list.selectedItems():
@@ -999,10 +1014,13 @@ class BatchDialog(QDialog):
             self.spn_silence.value())
         self._worker.file_started.connect(self._on_file_started)
         self._worker.file_done.connect(self._on_file_done)
+        self._worker.seg_tick.connect(self._on_seg_tick)
         self._worker.log.connect(self.log.append)
         self._worker.all_done.connect(self._on_all_done)
 
-        self.progress.setRange(0, 0)   # 不確定モード（処理中アニメーション）
+        self.progress.setRange(0, 1000)
+        self.progress.setValue(0)
+        self._creep = 0.0
         self.progress.setVisible(True)
         self.lbl_current.setVisible(True)
         self.btn_start.setEnabled(False)
@@ -1018,9 +1036,23 @@ class BatchDialog(QDialog):
             self._worker.cancel()
         self.btn_cancel.setEnabled(False)
 
+    def _update_progress(self):
+        # 全体進捗 = (完了ファイル数 + 処理中ファイルのじわ進み) / 総数
+        cur, total = self._cur_file, max(self._cur_total, 1)
+        overall = ((cur - 1) + self._creep) / total if cur > 0 else 0.0
+        self.progress.setValue(max(0, min(1000, int(overall * 1000))))
+
+    def _on_seg_tick(self):
+        # whisperが1区間出すたびに、現ファイル分(上限0.95)へ向けてじわっと前進
+        self._creep += (0.95 - self._creep) * 0.06
+        self._update_progress()
+
     def _on_file_started(self, current: int, total: int, name: str):
         import time
-        self.progress.setRange(0, 0)   # 不確定モード（処理中アニメーション）
+        self._cur_file  = current
+        self._cur_total = total
+        self._creep     = 0.0
+        self._update_progress()
         if self._batch_start_time is None:
             self._batch_start_time = time.time()
         self._file_start_time = time.time()
@@ -1031,6 +1063,11 @@ class BatchDialog(QDialog):
 
     def _on_file_done(self, current: int, total: int, ok: bool, msg: str):
         import time
+        # このファイルを完了扱いにしてバーを確定的に前進
+        self._cur_file  = current
+        self._cur_total = total
+        self._creep     = 1.0
+        self._update_progress()
         status = '✓' if ok else '✗'
         self.log.append(f"  {status} {msg}")
 
@@ -1056,9 +1093,9 @@ class BatchDialog(QDialog):
         self.btn_cancel.setEnabled(False)
         self.btn_remove.setEnabled(True)
         self.btn_clear.setEnabled(True)
-        # 不確定モードを止めて完了状態（満杯）に
-        self.progress.setRange(0, 1)
-        self.progress.setValue(1)
+        # 完了＝バー満杯
+        self.progress.setRange(0, 1000)
+        self.progress.setValue(1000)
         self.lbl_current.setVisible(False)
         msg = (f"完了: {success}/{total} ファイル処理しました"
                if _lang == 'ja' else f"Done: {success}/{total} files processed.")
