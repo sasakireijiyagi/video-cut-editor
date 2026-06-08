@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>おまかせ文字起こし / EasyTranscribe</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+    }
+    .sub {
+      color: #8b949e;
+      font-size: 1rem;
+      margin-bottom: 3rem;
+    }
+    .buttons {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 1.4rem 2.5rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 1.1rem;
+      font-weight: 600;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .btn:hover { transform: translateY(-2px); opacity: 0.85; }
+    .btn-mac {
+      background: #238636;
+      color: #fff;
+    }
+    .btn-win {
+      background: #1f6feb;
+      color: #fff;
+    }
+    .btn .os { font-size: 1.8rem; }
+    .btn .label { font-size: 0.8rem; font-weight: 400; opacity: 0.85; }
+    .note {
+      margin-top: 2.5rem;
+      color: #8b949e;
+      font-size: 0.85rem;
+      line-height: 1.8;
+    }
+    .gh-link {
+      margin-top: 2rem;
+      color: #58a6ff;
+      font-size: 0.9rem;
+      text-decoration: none;
+    }
+    .gh-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>おまかせ文字起こし</h1>
+  <p class="sub">EasyTranscribe — 完全ローカル・無料の動画文字起こしツール</p>
+
+  <div class="buttons">
+    <a class="btn btn-mac"
+       href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Mac.dmg">
+      <span class="os">🍎</span>
+      Mac 版をダウンロード
+      <span class="label">EasyTranscribe-Mac.dmg</span>
+    </a>
+    <a class="btn btn-win"
+       href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Windows.zip">
+      <span class="os">🪟</span>
+      Windows 版をダウンロード
+      <span class="label">EasyTranscribe-Windows.zip</span>
+    </a>
+  </div>
+
+  <p class="note">
+    Pythonのインストール不要。<br>
+    ※ 文字起こしエンジン（whisper）は初回起動時に自動でダウンロードされます。
+  </p>
+
+  <a class="gh-link"
+     href="https://github.com/sasakireijiyagi/video-cut-editor">
+    GitHub でソースを見る →
+  </a>
+</body>
+</html>
