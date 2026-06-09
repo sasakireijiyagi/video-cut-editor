@@ -7,6 +7,9 @@ import sys
 import os
 import shutil
 
+APP_VERSION = "1.0.3"
+GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
+
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
 def _find_pyqt6_plugins() -> str:
     import glob
@@ -431,6 +434,175 @@ _LANG_MAP = {
     'Hindi हिन्दी': 'hi',
     '自動検出 / Auto': 'auto',
 }
+
+
+class VersionCheckWorker(QThread):
+    """GitHub Releases API で最新バージョンを確認するスレッド"""
+    result = pyqtSignal(str, str, str)  # (latest_tag, release_url, dmg_url)
+    error  = pyqtSignal(str)
+
+    def run(self):
+        try:
+            import urllib.request, json
+            url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            req = urllib.request.Request(url, headers={"User-Agent": "EasyTranscribe"})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read())
+            tag = data.get("tag_name", "")
+            html_url = data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases")
+            # プラットフォームに合わせたダウンロードURLを探す
+            download_url = ""
+            ext = ".dmg" if sys.platform == "darwin" else ".zip"
+            for asset in data.get("assets", []):
+                if asset.get("name", "").endswith(ext):
+                    download_url = asset.get("browser_download_url", "")
+                    break
+            self.result.emit(tag, html_url, download_url)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class UpdateDownloadWorker(QThread):
+    """新バージョンをダウンロード→インストール準備するスレッド（Mac/Windows対応）"""
+    progress = pyqtSignal(int)   # 0-100
+    finished = pyqtSignal(str)   # 新アプリのパス（Mac: _new.app / Win: _new フォルダ）
+    error    = pyqtSignal(str)
+
+    def __init__(self, download_url: str):
+        super().__init__()
+        self.download_url = download_url
+
+    def run(self):
+        import urllib.request, tempfile, subprocess, glob, shutil, os, zipfile
+
+        try:
+            req = urllib.request.Request(
+                self.download_url, headers={"User-Agent": "EasyTranscribe"})
+
+            if sys.platform == "darwin":
+                self._run_mac(req, tempfile, subprocess, glob, shutil, os)
+            else:
+                self._run_win(req, tempfile, shutil, os, zipfile)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+    # ── Mac ──────────────────────────────────────────────────────
+    def _run_mac(self, req, tempfile, subprocess, glob, shutil, os):
+        tmp_dmg = os.path.join(tempfile.gettempdir(), "EasyTranscribe_update.dmg")
+
+        with urllib.request.urlopen(req) as resp, open(tmp_dmg, "wb") as f:
+            import urllib.request
+            total = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total:
+                    self.progress.emit(min(int(downloaded * 85 / total), 85))
+
+        self.progress.emit(88)
+        result = subprocess.run(
+            ["hdiutil", "attach", tmp_dmg, "-nobrowse", "-noverify"],
+            capture_output=True, text=True)
+        if result.returncode != 0:
+            self.error.emit(f"マウント失敗: {result.stderr}")
+            return
+
+        mount_point = None
+        for line in result.stdout.splitlines():
+            if "/Volumes/" in line:
+                mount_point = line.split("\t")[-1].strip()
+                break
+        if not mount_point:
+            self.error.emit("マウントポイントが見つかりません")
+            return
+
+        self.progress.emit(92)
+        apps = glob.glob(os.path.join(mount_point, "*.app"))
+        if not apps:
+            self.error.emit("DMG内に .app が見つかりません")
+            subprocess.run(["hdiutil", "detach", mount_point])
+            return
+
+        src_app = apps[0]
+        current_app = self._find_current_app_mac()
+        if not current_app:
+            current_app = f"/Applications/{os.path.basename(src_app)}"
+
+        tmp_new_app = current_app + "_new.app"
+        if os.path.exists(tmp_new_app):
+            shutil.rmtree(tmp_new_app)
+        shutil.copytree(src_app, tmp_new_app)
+
+        subprocess.run(["hdiutil", "detach", mount_point, "-quiet"])
+        os.remove(tmp_dmg)
+
+        self.progress.emit(100)
+        self.finished.emit(tmp_new_app)
+
+    def _find_current_app_mac(self) -> str:
+        if hasattr(sys, "_MEIPASS"):
+            parts = sys.executable.split("/")
+            for i, p in enumerate(parts):
+                if p.endswith(".app"):
+                    return "/".join(parts[:i+1])
+        return ""
+
+    # ── Windows ──────────────────────────────────────────────────
+    def _run_win(self, req, tempfile, shutil, os, zipfile):
+        import urllib.request
+        tmp_zip = os.path.join(tempfile.gettempdir(), "EasyTranscribe_update.zip")
+
+        with urllib.request.urlopen(req) as resp, open(tmp_zip, "wb") as f:
+            total = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                f.write(chunk)
+                downloaded += len(chunk)
+                if total:
+                    self.progress.emit(min(int(downloaded * 80 / total), 80))
+
+        self.progress.emit(82)
+        tmp_extract = os.path.join(tempfile.gettempdir(), "EasyTranscribe_update")
+        if os.path.exists(tmp_extract):
+            shutil.rmtree(tmp_extract)
+        with zipfile.ZipFile(tmp_zip, "r") as zf:
+            zf.extractall(tmp_extract)
+        os.remove(tmp_zip)
+
+        # EasyTranscribe フォルダを探す
+        candidates = [
+            d for d in os.listdir(tmp_extract)
+            if os.path.isdir(os.path.join(tmp_extract, d))
+        ]
+        if not candidates:
+            self.error.emit("ZIP内にフォルダが見つかりません")
+            return
+        src_dir = os.path.join(tmp_extract, candidates[0])
+
+        current_dir = self._find_current_dir_win()
+        if not current_dir:
+            current_dir = os.path.join(os.path.expanduser("~"), "EasyTranscribe")
+
+        new_dir = current_dir + "_new"
+        if os.path.exists(new_dir):
+            shutil.rmtree(new_dir)
+        shutil.copytree(src_dir, new_dir)
+
+        self.progress.emit(100)
+        self.finished.emit(new_dir)
+
+    def _find_current_dir_win(self) -> str:
+        if hasattr(sys, "_MEIPASS"):
+            return os.path.dirname(sys.executable)
+        return ""
 
 
 class FFmpegWorker(QThread):
@@ -2815,6 +2987,138 @@ class MainWindow(QMainWindow):
         links.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links.setOpenExternalLinks(True)
         layout.addWidget(links)
+
+        # バージョン表示 & アップデート
+        from PyQt6.QtWidgets import QProgressBar
+        ver_lbl = QLabel(f"<p style='text-align:center; color:#888; font-size:11px;'>v{APP_VERSION}</p>")
+        ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(ver_lbl)
+
+        progress_bar = QProgressBar()
+        progress_bar.setRange(0, 100)
+        progress_bar.setTextVisible(True)
+        progress_bar.hide()
+        layout.addWidget(progress_bar)
+
+        check_btn = QPushButton("アップデートを確認")
+        check_btn.setFixedWidth(180)
+        check_btn_wrap = QWidget()
+        check_btn_layout = QHBoxLayout(check_btn_wrap)
+        check_btn_layout.setContentsMargins(0, 0, 0, 0)
+        check_btn_layout.addStretch()
+        check_btn_layout.addWidget(check_btn)
+        check_btn_layout.addStretch()
+        layout.addWidget(check_btn_wrap)
+
+        def _do_update(dmg_url, new_tag):
+            """ダウンロード→インストール"""
+            check_btn.hide()
+            progress_bar.show()
+            progress_bar.setValue(0)
+
+            worker = UpdateDownloadWorker(dmg_url)
+            worker.progress.connect(progress_bar.setValue)
+
+            def _on_finished(new_path):
+                import subprocess, os
+                progress_bar.hide()
+                ver_lbl.setText(
+                    "<p style='text-align:center; color:#2a8a55; font-size:11px;'>"
+                    "インストール完了！再起動します…</p>"
+                )
+                if sys.platform == "darwin":
+                    # Mac: シェルスクリプトで _new.app に差し替えて再起動
+                    current_app = new_path.replace("_new.app", ".app")
+                    script = (
+                        f'#!/bin/bash\n'
+                        f'sleep 1\n'
+                        f'rm -rf "{current_app}"\n'
+                        f'mv "{new_path}" "{current_app}"\n'
+                        f'open "{current_app}"\n'
+                    )
+                    script_path = "/tmp/easytranscribe_update.sh"
+                    with open(script_path, "w") as f:
+                        f.write(script)
+                    os.chmod(script_path, 0o755)
+                    subprocess.Popen(["bash", script_path])
+                else:
+                    # Windows: バッチファイルで _new フォルダに差し替えて再起動
+                    current_dir = new_path.replace("_new", "")
+                    exe_name = "EasyTranscribe.exe"
+                    new_exe = os.path.join(new_path, exe_name)
+                    script = (
+                        f'@echo off\n'
+                        f'timeout /t 2 /nobreak >nul\n'
+                        f'rmdir /s /q "{current_dir}"\n'
+                        f'move "{new_path}" "{current_dir}"\n'
+                        f'start "" "{os.path.join(current_dir, exe_name)}"\n'
+                    )
+                    script_path = os.path.join(os.environ.get("TEMP", "C:\\Temp"),
+                                               "easytranscribe_update.bat")
+                    with open(script_path, "w") as f:
+                        f.write(script)
+                    subprocess.Popen(["cmd", "/c", script_path],
+                                     creationflags=subprocess.CREATE_NO_WINDOW
+                                     if hasattr(subprocess, "CREATE_NO_WINDOW") else 0)
+                QApplication.quit()
+
+            def _on_error(msg):
+                progress_bar.hide()
+                ver_lbl.setText(
+                    f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
+                    f"失敗: {msg}</p>"
+                )
+                check_btn.show()
+
+            worker.finished.connect(_on_finished)
+            worker.error.connect(_on_error)
+            dlg._update_worker = worker
+            worker.start()
+
+        def _check_version():
+            check_btn.setEnabled(False)
+            check_btn.setText("確認中…")
+            worker = VersionCheckWorker()
+
+            def _on_result(tag, url, dmg_url):
+                latest = tag.lstrip("v")
+                if latest and latest > APP_VERSION:
+                    ver_lbl.setText(
+                        f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
+                        f"v{latest} が利用可能！</p>"
+                    )
+                    if dmg_url:
+                        check_btn.setText(f"v{latest} にアップデート")
+                        check_btn.setEnabled(True)
+                        check_btn.clicked.disconnect()
+                        check_btn.clicked.connect(lambda: _do_update(dmg_url, latest))
+                    else:
+                        ver_lbl.setOpenExternalLinks(True)
+                        ver_lbl.setText(
+                            f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
+                            f"<a href='{url}'>v{latest} をダウンロード</a></p>"
+                        )
+                        check_btn.hide()
+                else:
+                    ver_lbl.setText(
+                        f"<p style='text-align:center; color:#2a8a55; font-size:11px;'>"
+                        f"v{APP_VERSION}（最新です）</p>"
+                    )
+                    check_btn.hide()
+
+            def _on_error(msg):
+                ver_lbl.setText(
+                    "<p style='text-align:center; color:#888; font-size:11px;'>確認に失敗しました</p>"
+                )
+                check_btn.setEnabled(True)
+                check_btn.setText("アップデートを確認")
+
+            worker.result.connect(_on_result)
+            worker.error.connect(_on_error)
+            dlg._ver_worker = worker
+            worker.start()
+
+        check_btn.clicked.connect(_check_version)
 
         btn = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
         btn.accepted.connect(dlg.accept)

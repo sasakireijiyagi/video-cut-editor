@@ -4,3 +4,17 @@ VideoCutEditor.app/
 run.sh
 __pycache__/
 *.pyc
+build/
+dist/
+*.dmg
+*.spec
+AppIcon_t.png
+promo_work/
+setup_work/
+*.mp4
+make_promo*.py
+make_setup*.py
+promo_slides.py
+promo_tts.py
+make_promo.py
+make_promo_video.md

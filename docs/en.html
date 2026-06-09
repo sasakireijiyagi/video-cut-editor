@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>おまかせ文字起こし / EasyTranscribe</title>
+  <title>EasyTranscribe — Free Local Video Transcription Tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Hina+Mincho&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -16,11 +16,21 @@
       line-height: 1.6;
     }
 
+    /* ── Lang switcher ── */
+    .lang-bar {
+      text-align: right;
+      padding: 0.6rem 1.5rem;
+      font-size: 0.8rem;
+    }
+    .lang-bar a { color: #999; text-decoration: none; }
+    .lang-bar a:hover { color: #e63946; }
+    .lang-bar .active { color: #e63946; font-weight: 600; }
+
     /* ── Hero ── */
     .hero {
       background: #f9f9f9;
       text-align: center;
-      padding: 2.5rem 2rem 2rem;
+      padding: 2rem 2rem 2rem;
     }
 
     .hero-title {
@@ -38,15 +48,14 @@
 
     .hero-title h1 {
       font-size: 2.6rem;
-      font-weight: 400;
-      letter-spacing: 0.05em;
+      font-weight: 700;
+      letter-spacing: -0.01em;
       color: #1a1a1a;
-      font-family: 'Hina Mincho', serif;
     }
 
     .hero-en {
       font-size: 0.9rem;
-      color: #7a90a8;
+      color: #999;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       margin-bottom: 0.8rem;
@@ -54,7 +63,7 @@
 
     .hero-tagline {
       font-size: 1.1rem;
-      color: #444444;
+      color: #444;
       margin-bottom: 1.8rem;
       line-height: 1.8;
     }
@@ -85,24 +94,12 @@
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(0,0,0,0.12);
     }
-    .btn-mac {
-      background: #e63946;
-      color: #fff;
-    }
-    .btn-win {
-      background: #1a1a1a;
-      color: #fff;
-    }
-
-    .btn-icon {
-      width: 18px;
-      height: 18px;
-      opacity: 0.9;
-    }
+    .btn-mac { background: #e63946; color: #fff; }
+    .btn-win { background: #1a1a1a; color: #fff; }
 
     .hero-note {
       font-size: 0.8rem;
-      color: #999999;
+      color: #999;
     }
 
     /* ── Screenshot ── */
@@ -129,7 +126,7 @@
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #999999;
+      color: #999;
       text-align: center;
       margin-bottom: 2rem;
     }
@@ -145,9 +142,7 @@
       padding: 1.6rem;
       transition: box-shadow 0.15s;
     }
-    .feature:hover {
-      box-shadow: 0 4px 20px rgba(44,62,80,0.08);
-    }
+    .feature:hover { box-shadow: 0 4px 20px rgba(44,62,80,0.08); }
     .feature-label {
       font-size: 0.7rem;
       font-weight: 700;
@@ -164,77 +159,8 @@
     }
     .feature p {
       font-size: 0.82rem;
-      color: #666666;
+      color: #666;
       line-height: 1.65;
-    }
-
-    /* ── Install ── */
-    .install-section {
-      background: #fff;
-      border-top: 1px solid #e8e8e8;
-      border-bottom: 1px solid #e8e8e8;
-      padding: 2.5rem 2rem;
-      margin-bottom: 2.5rem;
-    }
-    .install-inner {
-      max-width: 640px;
-      margin: 0 auto;
-      text-align: center;
-    }
-    .install-inner h2 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 0.5rem;
-    }
-    .install-inner .sub {
-      font-size: 0.85rem;
-      color: #999999;
-      margin-bottom: 2.5rem;
-    }
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 0.8rem;
-      text-align: left;
-    }
-    .step {
-      display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 1rem 1.2rem;
-      background: #f2f2f2;
-      border-radius: 10px;
-    }
-    .step-num {
-      width: 1.6rem;
-      height: 1.6rem;
-      border-radius: 50%;
-      background: #e63946;
-      color: #fff;
-      font-size: 0.75rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      margin-top: 0.1rem;
-    }
-    .step-body {
-      font-size: 0.88rem;
-      color: #444444;
-      line-height: 1.65;
-    }
-    .step-body strong {
-      color: #1a1a1a;
-    }
-    code {
-      background: #e8f0fe;
-      color: #e63946;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.82rem;
-      font-family: 'SFMono-Regular', Consolas, monospace;
     }
 
     /* ── Footer ── */
@@ -242,12 +168,9 @@
       text-align: center;
       padding: 2.5rem 2rem;
       font-size: 0.82rem;
-      color: #999999;
+      color: #999;
     }
-    footer a {
-      color: #e63946;
-      text-decoration: none;
-    }
+    footer a { color: #e63946; text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     .btn-donate {
       display: inline-block;
@@ -261,56 +184,42 @@
       font-weight: 600;
       transition: background 0.15s, color 0.15s;
     }
-    .btn-donate:hover {
-      background: #e63946;
-      color: #fff;
-    }
-    .lang-bar {
-      text-align: right;
-      padding: 0.6rem 1.5rem;
-      font-size: 0.8rem;
-    }
-    .lang-bar a { color: #999; text-decoration: none; }
-    .lang-bar a:hover { color: #e63946; }
-    .lang-bar .active { color: #e63946; font-weight: 600; }
-    .footer-divider {
-      margin: 0 0.5rem;
-      opacity: 0.4;
-    }
+    .btn-donate:hover { background: #e63946; color: #fff; }
+    .footer-divider { margin: 0 0.5rem; opacity: 0.4; }
   </style>
 </head>
 <body>
 
   <div class="lang-bar">
-    <span class="active">日本語</span>
+    <a href="index.html">日本語</a>
     &nbsp;|&nbsp;
-    <a href="en.html">English</a>
+    <span class="active">English</span>
   </div>
 
   <section class="hero">
     <div class="hero-title">
       <img src="AppIcon.png" alt="icon">
-      <h1>おまかせ文字起こし</h1>
+      <h1>EasyTranscribe</h1>
     </div>
-    <p class="hero-en">EasyTranscribe</p>
+    <p class="hero-en">おまかせ文字起こし</p>
     <p class="hero-tagline">
-      動画を開いてボタンを押すだけ。<br>
-      完全ローカル・無料・サービス終了なしの文字起こしツール。
+      Just open a video and press a button.<br>
+      Free, fully local transcription — no cloud, no subscription.
     </p>
     <div class="hero-buttons">
       <a class="btn btn-mac" href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Mac.dmg">
-        Mac 版をダウンロード
+        Download for Mac
       </a>
       <a class="btn btn-win" href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Windows.zip">
-        Windows 版をダウンロード
+        Download for Windows
       </a>
     </div>
-    <p class="hero-note">Python のインストール不要</p>
-    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">開発を寄付で支援！</a>
+    <p class="hero-note">No Python installation required</p>
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">Support Development</a>
   </section>
 
   <div class="screenshot-section">
-    <img src="screenshot.png" alt="おまかせ文字起こし スクリーンショット">
+    <img src="screenshot.png" alt="EasyTranscribe screenshot">
   </div>
 
   <section class="features-section">
@@ -318,46 +227,45 @@
     <div class="features-grid">
       <div class="feature">
         <div class="feature-label">Transcription</div>
-        <h3>高精度な文字起こし</h3>
-        <p>OpenAI Whisper で 100 言語に対応。講義・会議・インタビュー動画を自動転写。</p>
+        <h3>High-accuracy transcription</h3>
+        <p>Powered by OpenAI Whisper. Supports 100 languages — lectures, meetings, interviews.</p>
       </div>
       <div class="feature">
         <div class="feature-label">Editing</div>
-        <h3>かんたん編集・カット</h3>
-        <p>文字起こし結果から残したい部分だけ選んで、動画をカット出力。時間の微調整もかんたん。</p>
+        <h3>Easy edit &amp; cut</h3>
+        <p>Select SRT segments and cut with ffmpeg. Fine-tune start/end times with precision controls.</p>
       </div>
       <div class="feature">
         <div class="feature-label">Batch</div>
-        <h3>バッチ文字起こし</h3>
-        <p>複数ファイルをキュー処理。実行中もファイルを追加でき、残り時間を推定表示。</p>
+        <h3>Batch transcription</h3>
+        <p>Queue multiple files. Add more while running. Shows estimated time remaining.</p>
       </div>
       <div class="feature">
         <div class="feature-label">Filler Cut</div>
-        <h3>フィラーカット</h3>
-        <p>「えー」「あの」などを 8 言語のリストから自動除去。カスタマイズも可。</p>
+        <h3>Filler word removal</h3>
+        <p>Auto-detect and remove filler words in 8 languages. Fully customizable word list.</p>
       </div>
       <div class="feature">
         <div class="feature-label">Subtitle</div>
-        <h3>字幕焼き込み</h3>
-        <p>太ゴシック・白文字・黒縁取りで映像に直接焼き込み。縦動画も自動対応。</p>
+        <h3>Subtitle burn-in</h3>
+        <p>Bold white text with black outline, burned directly into the video. Auto-detects vertical video.</p>
       </div>
       <div class="feature">
         <div class="feature-label">Export</div>
-        <h3>EAF 書き出し</h3>
-        <p>言語学ツール ELAN 用の EAF ファイルとして書き出し。研究用途にも対応。</p>
+        <h3>EAF export</h3>
+        <p>Export as EAF files for ELAN — the linguistic annotation tool. Great for research use.</p>
       </div>
     </div>
   </section>
-
 
   <footer>
     <a href="https://github.com/sasakireijiyagi/video-cut-editor">GitHub</a>
     <span class="footer-divider">|</span>
     MIT License
     <span class="footer-divider">|</span>
-    佐々木玲仁（ヤギ製作所）
+    Reiji Sasaki (Yagi Productions)
     <br><br>
-    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">開発を寄付で支援！</a>
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">Support Development</a>
   </footer>
 
 </body>
