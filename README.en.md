@@ -239,6 +239,14 @@ This is experimental software for research and educational use. No warranty is p
 
 ---
 
+## Citation
+
+If you use this tool in your research, please cite it as:
+
+> Sasaki, R. (2025). EasyTranscribe [Computer software]. https://doi.org/10.5281/zenodo.20515527
+
+---
+
 ## License
 
 [MIT License](LICENSE) © 2025 Reiji Sasaki  
