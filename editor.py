@@ -2936,6 +2936,10 @@ class MainWindow(QMainWindow):
         close_action.triggered.connect(self._reset)
 
         help_menu = self.menuBar().addMenu(tr('menu_help'))
+        usage_action = help_menu.addAction('使い方を見る' if _lang == 'ja' else 'How to use')
+        usage_action.triggered.connect(lambda: QDesktopServices.openUrl(
+            QUrl('https://github.com/sasakireijiyagi/video-cut-editor#readme')))
+        help_menu.addSeparator()
         about_action = help_menu.addAction(tr('menu_about'))
         about_action.triggered.connect(self._show_about)
 
