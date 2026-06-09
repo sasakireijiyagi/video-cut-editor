@@ -106,6 +106,13 @@
     }
     .hero-downloads {
       margin-top: 0.8rem;
+      font-size: 0.8rem;
+      color: #999;
+      letter-spacing: 0.04em;
+    }
+    .hero-downloads span {
+      color: #e63946;
+      font-weight: 700;
     }
     .hero-readme {
       margin-top: 0.6rem;
@@ -349,9 +356,7 @@
         Windows 版をダウンロード
       </a>
     </div>
-    <p class="hero-downloads">
-      <img src="https://img.shields.io/github/downloads/sasakireijiyagi/video-cut-editor/total?style=flat&label=Downloads&color=e63946" alt="Total Downloads">
-    </p>
+    <p class="hero-downloads" id="download-count"></p>
     <p class="hero-readme"><a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.md" target="_blank">使い方を読む →</a></p>
 
     <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">開発を寄付で支援！</a>
@@ -419,5 +424,14 @@
     <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">開発を寄付で支援！</a>
   </footer>
 
+<script>
+  fetch('downloads.json')
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('download-count');
+      if (el && d.total > 0) el.innerHTML = 'Downloads <span>' + d.total.toLocaleString() + '</span>';
+    })
+    .catch(() => {});
+</script>
 </body>
 </html>

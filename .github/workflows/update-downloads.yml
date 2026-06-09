@@ -1,0 +1,33 @@
+name: Update Download Count
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 毎日UTC0時（日本時間9時）
+  workflow_dispatch:       # 手動実行も可能
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch download count
+        run: |
+          COUNT=$(curl -s https://api.github.com/repos/sasakireijiyagi/video-cut-editor/releases \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            | python3 -c "
+          import json, sys
+          releases = json.load(sys.stdin)
+          total = sum(a['download_count'] for r in releases for a in r.get('assets', []))
+          print(total)
+          ")
+          echo "{\"total\": $COUNT}" > docs/downloads.json
+          echo "Download count: $COUNT"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/downloads.json
+          git diff --cached --quiet || git commit -m "Update download count [skip ci]"
+          git push
