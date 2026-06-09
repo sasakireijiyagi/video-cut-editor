@@ -20,16 +20,7 @@
 
 ## ダウンロード（インストーラー）
 
-Pythonのインストール不要！ダウンロードしてすぐ使えます。
-
-| OS | ダウンロード |
-|----|-------------|
-| Mac | [EasyTranscribe-Mac.dmg](https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Mac.dmg) |
-| Windows | [EasyTranscribe-Windows.zip](https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Windows.zip) |
-
-> **Macの場合：** DMGを開いて EasyTranscribe.app を Applications フォルダにドラッグ。  
-> **Windowsの場合：** ZIPを展開して EasyTranscribe フォルダ内の `EasyTranscribe.exe` を実行。  
-> ※ whisper（文字起こしエンジン）は別途インストールが必要です（初回のみ）。
+**[ダウンロードページ](https://sasakireijiyagi.github.io/video-cut-editor/)** からどうぞ。Pythonのインストール不要！
 
 ---
 

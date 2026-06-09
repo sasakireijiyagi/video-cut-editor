@@ -7,6 +7,12 @@ Fully local · Free · No service shutdown risk. Mac / Windows supported.
 
 ---
 
+## Download (Installer)
+
+Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/en.html)** — no Python installation required!
+
+---
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
 
 If this tool is useful to you, please give it a **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** — it really helps!
