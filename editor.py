@@ -2977,6 +2977,8 @@ class MainWindow(QMainWindow):
 
         links = QLabel(
             "<p style='text-align:center;'>"
+            "<a href='https://sasakireijiyagi.github.io/video-cut-editor/'>ダウンロードページ</a>"
+            "　｜　"
             "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
             "　｜　"
             "<a href='https://github.com/sasakireijiyagi/video-cut-editor/issues'>💬 感想・バグ報告</a>"
