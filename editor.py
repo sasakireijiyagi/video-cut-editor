@@ -7,7 +7,7 @@ import sys
 import os
 import shutil
 
-APP_VERSION = "1.0.7"
+APP_VERSION = "1.0.8"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -950,6 +950,73 @@ class FFmpegWorker(QThread):
         else:
             self.done.emit(True,
                 f"{'Done' if _lang=='en' else '完了'}: {len(segs)} {'file(s) saved to' if _lang=='en' else 'ファイルを'} {self.outdir}{'.' if _lang=='en' else ' に保存しました'}")
+
+
+# ──────────────────────────────────────────────────────────────────
+# Full export worker（カットなし全体書き出し）
+# ──────────────────────────────────────────────────────────────────
+
+class FullExportWorker(QThread):
+    log  = pyqtSignal(str)
+    done = pyqtSignal(bool, str)
+
+    def __init__(self, entries: List[SRTEntry], video: str, outdir: str,
+                 subtitle_burn: bool = False, font_size: int = 40, font_name: str = ''):
+        super().__init__()
+        self.entries       = entries
+        self.video         = video
+        self.outdir        = outdir
+        self.subtitle_burn = subtitle_burn
+        self.font_size     = font_size
+        self.font_name     = font_name
+
+    def run(self):
+        stem = Path(self.video).stem
+        out  = os.path.join(self.outdir, f"{stem}_full.mp4")
+
+        if self.subtitle_burn:
+            import tempfile
+            # 全エントリのSRTを一時ファイルに書き出す（オリジナルのタイムスタンプそのまま）
+            tmp_srt = os.path.join(self.outdir, '_tmp_full_sub.srt')
+            lines = []
+            for idx, e in enumerate(self.entries, 1):
+                lines.append(str(idx))
+                lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                lines.append(e.text)
+                lines.append('')
+            with open(tmp_srt, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+
+            # subtitle_vfを直接組み立て
+            font = self.font_name.strip() if self.font_name.strip() else FFmpegWorker._pick_font()
+            size = self.font_size if self.font_size > 0 else 40
+            style = (
+                f"FontName={font},FontSize={size},Bold=1,"
+                "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+                "BorderStyle=1,Outline=4,Shadow=0,Alignment=2,MarginV=30"
+            )
+            escaped = tmp_srt.replace('\\', '/').replace(':', '\\:')
+            vf = f"subtitles='{escaped}':force_style='{style}'"
+
+            cmd = [FFMPEG_BIN, '-y', '-i', self.video,
+                   '-vf', vf,
+                   '-c:v', 'libx264', '-preset', 'fast', '-c:a', 'aac', out]
+            self.log.emit('全体書き出し（字幕焼き込み）...' if _lang == 'ja' else 'Exporting full video with subtitles...')
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if os.path.exists(tmp_srt):
+                os.remove(tmp_srt)
+        else:
+            # 字幕なし: コピーのみ
+            cmd = [FFMPEG_BIN, '-y', '-i', self.video, '-c', 'copy', out]
+            self.log.emit('全体書き出し...' if _lang == 'ja' else 'Exporting full video...')
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+
+        if proc.returncode != 0:
+            self.log.emit(f"  ERROR: {proc.stderr[-400:]}")
+            self.done.emit(False, '書き出しに失敗しました' if _lang == 'ja' else 'Export failed')
+            return
+
+        self.done.emit(True, f"{'Done' if _lang=='en' else '完了'}: {out}")
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -2673,17 +2740,25 @@ class MainWindow(QMainWindow):
 
         # ── 実行行 ────────────────────────────────────
         exec_row = QHBoxLayout()
-        self.btn_exec   = QPushButton(tr('execute'))
+        self.btn_exec        = QPushButton(tr('execute'))
+        self.btn_export_full = QPushButton('▶ 全体を書き出す' if _lang == 'ja' else '▶ Export full video')
+        self.btn_export_full.setToolTip(
+            'カットせず動画全体を書き出す（字幕焼き込みあり/なし）'
+            if _lang == 'ja' else
+            'Export the full video without cutting (with or without subtitle burn-in)')
         self.btn_cancel = QPushButton(tr('cancel'))
         f = self.btn_exec.font()
         f.setPointSize(13)
         self.btn_exec.setFont(f)
+        self.btn_export_full.setFont(f)
         self.btn_cancel.setEnabled(False)
         self.btn_exec.clicked.connect(self._execute)
+        self.btn_export_full.clicked.connect(self._execute_full)
         self.btn_cancel.clicked.connect(self._cancel)
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         exec_row.addWidget(self.btn_exec)
+        exec_row.addWidget(self.btn_export_full)
         exec_row.addWidget(self.btn_cancel)
         exec_row.addWidget(self.progress, stretch=1)
         vbox.addLayout(exec_row)
@@ -3023,7 +3098,42 @@ class MainWindow(QMainWindow):
         self.worker.log.connect(self.log.append)
         self.worker.done.connect(self._on_done)
         self.btn_exec.setEnabled(False)
+        self.btn_export_full.setEnabled(False)
         self.btn_cancel.setEnabled(True)
+        self.worker.start()
+
+    def _execute_full(self):
+        """カットせず動画全体を書き出す（字幕焼き込みあり/なし）"""
+        if not self.video_path:
+            QMessageBox.warning(self, tr('err_title'), tr('err_no_video'))
+            return
+
+        outdir = self.txt_dir.text()
+        os.makedirs(outdir, exist_ok=True)
+        stem = Path(self.video_path).stem
+        burn = self.chk_burn_sub.isChecked()
+
+        if burn and not _ffmpeg_has_subtitles():
+            QMessageBox.warning(self, '字幕焼き込み非対応のffmpeg' if _lang == 'ja' else 'ffmpeg without subtitle support',
+                                _subtitle_unavailable_msg())
+            return
+
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(True)
+        self.btn_exec.setEnabled(False)
+        self.btn_export_full.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+
+        self.worker = FullExportWorker(
+            entries=self.srt_tbl.entries,
+            video=self.video_path,
+            outdir=outdir,
+            subtitle_burn=burn,
+            font_size=self.spn_font_size.value(),
+            font_name=self.txt_font.text(),
+        )
+        self.worker.log.connect(self.log.append)
+        self.worker.done.connect(self._on_done)
         self.worker.start()
 
     def _populate_models(self):
@@ -3085,8 +3195,10 @@ class MainWindow(QMainWindow):
 
     def _on_done(self, ok: bool, msg: str):
         self.btn_exec.setEnabled(True)
+        self.btn_export_full.setEnabled(True)
         self.btn_cancel.setEnabled(False)
         self.progress.setVisible(False)
+        self.progress.setRange(0, 1)
         self.log.append(msg)
         fn = QMessageBox.information if ok else QMessageBox.warning
         fn(self, tr('done_title') if ok else tr('err_title'), msg)
