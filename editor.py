@@ -3256,10 +3256,12 @@ class MainWindow(QMainWindow):
                         check_btn.clicked.disconnect()
                         check_btn.clicked.connect(lambda: _do_update(dmg_url, latest))
                     else:
+                        landing = "https://sasakireijiyagi.github.io/video-cut-editor/"
                         ver_lbl.setOpenExternalLinks(True)
                         ver_lbl.setText(
                             f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
-                            f"<a href='{url}'>v{latest} をダウンロード</a></p>"
+                            f"v{latest} が利用可能です。<br>"
+                            f"<a href='{landing}'>ダウンロードページ</a>から最新版をインストールしてください。</p>"
                         )
                         check_btn.hide()
                 else:
@@ -3270,11 +3272,15 @@ class MainWindow(QMainWindow):
                     check_btn.hide()
 
             def _on_error(msg):
+                landing = "https://sasakireijiyagi.github.io/video-cut-editor/"
+                ver_lbl.setOpenExternalLinks(True)
                 ver_lbl.setText(
-                    "<p style='text-align:center; color:#888; font-size:11px;'>確認に失敗しました</p>"
+                    f"<p style='text-align:center; color:#888; font-size:11px;'>"
+                    f"確認に失敗しました。<br>"
+                    f"<a href='{landing}'>ダウンロードページ</a>で最新版を確認してください。</p>"
                 )
                 check_btn.setEnabled(True)
-                check_btn.setText("アップデートを確認")
+                check_btn.setText("再試行")
 
             worker.result.connect(_on_result)
             worker.error.connect(_on_error)
