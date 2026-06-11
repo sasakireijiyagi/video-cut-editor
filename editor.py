@@ -322,6 +322,147 @@ def _find_whisper() -> str:
 FFMPEG_BIN  = _find_ffmpeg()
 WHISPER_BIN = _find_whisper()
 
+def _is_ffmpeg_ok() -> bool:
+    try:
+        subprocess.run([FFMPEG_BIN, '-version'], capture_output=True, timeout=5)
+        return True
+    except Exception:
+        return False
+
+def _is_whisper_ok() -> bool:
+    try:
+        subprocess.run([WHISPER_BIN, '--help'], capture_output=True, timeout=5)
+        return True
+    except Exception:
+        return False
+
+class SetupDialog(QDialog):
+    """ffmpeg / Whisper が見つからないときに自動インストールを提案するダイアログ"""
+
+    def __init__(self, missing_ffmpeg: bool, missing_whisper: bool, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('セットアップ' if _lang == 'ja' else 'Setup')
+        self.setMinimumWidth(480)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        if _lang == 'ja':
+            msg = '以下のソフトウェアが見つかりませんでした。\n自動でインストールしますか？\n（インターネット接続が必要です）'
+        else:
+            msg = 'The following software was not found.\nInstall automatically?\n(Internet connection required)'
+
+        layout.addWidget(QLabel(msg))
+
+        self.chk_ffmpeg  = QCheckBox('ffmpeg')
+        self.chk_whisper = QCheckBox('Whisper (openai-whisper)')
+        self.chk_ffmpeg.setChecked(missing_ffmpeg)
+        self.chk_whisper.setChecked(missing_whisper)
+        self.chk_ffmpeg.setEnabled(missing_ffmpeg)
+        self.chk_whisper.setEnabled(missing_whisper)
+        layout.addWidget(self.chk_ffmpeg)
+        layout.addWidget(self.chk_whisper)
+
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setFixedHeight(140)
+        self.log.setVisible(False)
+        layout.addWidget(self.log)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(False)
+        layout.addWidget(self.progress)
+
+        btns = QDialogButtonBox()
+        if _lang == 'ja':
+            self.btn_install = btns.addButton('インストール', QDialogButtonBox.ButtonRole.AcceptRole)
+            self.btn_skip    = btns.addButton('スキップ',     QDialogButtonBox.ButtonRole.RejectRole)
+        else:
+            self.btn_install = btns.addButton('Install', QDialogButtonBox.ButtonRole.AcceptRole)
+            self.btn_skip    = btns.addButton('Skip',    QDialogButtonBox.ButtonRole.RejectRole)
+        layout.addWidget(btns)
+
+        self.btn_install.clicked.connect(self._run_install)
+        self.btn_skip.clicked.connect(self.reject)
+
+        self._worker = None
+
+    def _run_install(self):
+        self.btn_install.setEnabled(False)
+        self.btn_skip.setEnabled(False)
+        self.log.setVisible(True)
+        self.progress.setVisible(True)
+
+        install_ffmpeg  = self.chk_ffmpeg.isChecked()
+        install_whisper = self.chk_whisper.isChecked()
+
+        self._worker = SetupWorker(install_ffmpeg, install_whisper)
+        self._worker.log_line.connect(self._append_log)
+        self._worker.finished.connect(self._on_done)
+        self._worker.start()
+
+    def _append_log(self, line: str):
+        self.log.append(line)
+
+    def _on_done(self, success: bool):
+        self.progress.setVisible(False)
+        self.btn_skip.setEnabled(True)
+        if success:
+            msg = 'インストール完了！アプリを再起動してください。' if _lang == 'ja' else 'Installation complete! Please restart the app.'
+            self.log.append(msg)
+            self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
+        else:
+            msg = 'エラーが発生しました。手動でインストールしてください。' if _lang == 'ja' else 'An error occurred. Please install manually.'
+            self.log.append(msg)
+
+
+class SetupWorker(QThread):
+    log_line = pyqtSignal(str)
+    finished = pyqtSignal(bool)
+
+    def __init__(self, ffmpeg: bool, whisper: bool):
+        super().__init__()
+        self.do_ffmpeg  = ffmpeg
+        self.do_whisper = whisper
+
+    def run(self):
+        try:
+            if self.do_ffmpeg and sys.platform != 'win32':
+                self.log_line.emit('Homebrewを確認中...')
+                brew = shutil.which('brew')
+                if not brew:
+                    self.log_line.emit('Homebrewをインストール中...')
+                    cmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+                    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    for line in proc.stdout:
+                        self.log_line.emit(line.rstrip())
+                    proc.wait()
+                self.log_line.emit('ffmpegをインストール中...')
+                proc = subprocess.Popen(['brew', 'install', 'ffmpeg'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in proc.stdout:
+                    self.log_line.emit(line.rstrip())
+                proc.wait()
+
+            if self.do_ffmpeg and sys.platform == 'win32':
+                self.log_line.emit('Windows: ffmpegを手動でインストールしてください。')
+                self.log_line.emit('https://ffmpeg.org/download.html')
+
+            if self.do_whisper:
+                self.log_line.emit('Whisperをインストール中...')
+                proc = subprocess.Popen(
+                    [sys.executable, '-m', 'pip', 'install', 'openai-whisper'],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                for line in proc.stdout:
+                    self.log_line.emit(line.rstrip())
+                proc.wait()
+
+            self.finished.emit(True)
+        except Exception as e:
+            self.log_line.emit(str(e))
+            self.finished.emit(False)
+
 _SUBTITLES_FILTER_CACHE = None
 
 def _ffmpeg_has_subtitles() -> bool:
@@ -3235,7 +3376,15 @@ def main():
     def _show_main():
         win.show()
 
-    splash.finished.connect(_show_main)
+    def _after_splash():
+        missing_ffmpeg  = not _is_ffmpeg_ok()
+        missing_whisper = not _is_whisper_ok()
+        if missing_ffmpeg or missing_whisper:
+            dlg = SetupDialog(missing_ffmpeg, missing_whisper)
+            dlg.exec()
+        _show_main()
+
+    splash.finished.connect(_after_splash)
     splash.start()
 
     sys.exit(app.exec())
