@@ -446,8 +446,18 @@ class SetupWorker(QThread):
                 proc.wait()
 
             if self.do_ffmpeg and sys.platform == 'win32':
-                self.log_line.emit('Windows: ffmpegを手動でインストールしてください。')
-                self.log_line.emit('https://ffmpeg.org/download.html')
+                winget = shutil.which('winget')
+                if winget:
+                    self.log_line.emit('ffmpegをインストール中（winget）...')
+                    proc = subprocess.Popen(
+                        ['winget', 'install', '--id', 'Gyan.FFmpeg', '-e', '--silent'],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    for line in proc.stdout:
+                        self.log_line.emit(line.rstrip())
+                    proc.wait()
+                else:
+                    self.log_line.emit('wingetが見つかりません。手動でインストールしてください。')
+                    self.log_line.emit('https://ffmpeg.org/download.html')
 
             if self.do_whisper:
                 self.log_line.emit('Whisperをインストール中...')
