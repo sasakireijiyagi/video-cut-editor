@@ -110,7 +110,7 @@ STRINGS = {
         'about_title'       : 'このソフトウェアについて',
         'about_donate_link' : '開発を支援する（寄付）',
         'dlg_open_video'    : '動画ファイルを選択',
-        'dlg_video_filter'  : '動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;すべて (*)',
+        'dlg_video_filter'  : '動画・音声 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;すべて (*)',
         'dlg_open_srt'      : 'SRTファイルを選択',
         'dlg_srt_filter'    : 'SRT (*.srt);;すべて (*)',
         'dlg_save_srt'      : 'SRTファイルを保存',
@@ -168,7 +168,7 @@ STRINGS = {
         'about_title'       : 'About おまかせ文字起こし',
         'about_donate_link' : 'Support Development (Donate)',
         'dlg_open_video'    : 'Select video file',
-        'dlg_video_filter'  : 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm);;All (*)',
+        'dlg_video_filter'  : 'Video / Audio (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;All (*)',
         'dlg_open_srt'      : 'Select SRT file',
         'dlg_srt_filter'    : 'SRT (*.srt);;All (*)',
         'dlg_save_srt'      : 'Save SRT file',
@@ -1133,8 +1133,8 @@ class BatchDialog(QDialog):
             self,
             'ファイルを選択（Cmd+クリックで複数選択）' if _lang == 'ja' else 'Select files (Cmd+click for multiple)',
             start,
-            '動画 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;すべて (*)' if _lang == 'ja'
-            else 'Video (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v);;All (*)')
+            '動画・音声 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;すべて (*)' if _lang == 'ja'
+            else 'Video / Audio (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;All (*)')
         if paths:
             self._last_dir = str(Path(paths[0]).parent)
         self._append_paths(paths)
@@ -1148,7 +1148,7 @@ class BatchDialog(QDialog):
         if not folder:
             return
         self._last_dir = folder
-        exts = {'.mp4', '.mov', '.MOV', '.avi', '.mkv', '.m4v'}
+        exts = {'.mp4', '.mov', '.MOV', '.avi', '.mkv', '.m4v', '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'}
         paths = [str(p) for p in sorted(Path(folder).iterdir())
                  if p.suffix in exts]
         self._append_paths(paths)
