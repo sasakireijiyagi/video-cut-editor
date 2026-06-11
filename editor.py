@@ -410,7 +410,10 @@ class SetupDialog(QDialog):
         self.progress.setVisible(False)
         self.btn_skip.setEnabled(True)
         if success:
-            msg = 'インストール完了！アプリを再起動してください。' if _lang == 'ja' else 'Installation complete! Please restart the app.'
+            if sys.platform == 'win32':
+                msg = 'インストール完了！PCを再起動してからアプリを起動してください。' if _lang == 'ja' else 'Installation complete! Please restart your PC, then launch the app again.'
+            else:
+                msg = 'インストール完了！アプリを再起動してください。' if _lang == 'ja' else 'Installation complete! Please restart the app.'
             self.log.append(msg)
             self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
         else:
@@ -468,6 +471,9 @@ class SetupWorker(QThread):
                     self.log_line.emit(line.rstrip())
                 proc.wait()
 
+            if sys.platform == 'win32' and self.do_ffmpeg:
+                self.log_line.emit('')
+                self.log_line.emit('⚠ Windowsの場合、PATHを反映するためにPCを再起動してください。')
             self.finished.emit(True)
         except Exception as e:
             self.log_line.emit(str(e))
