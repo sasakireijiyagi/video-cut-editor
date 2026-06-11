@@ -445,7 +445,7 @@
   </footer>
 
 <script>
-  fetch('downloads.json')
+  fetch('downloads.json?v=' + Date.now())
     .then(r => r.json())
     .then(d => {
       const el = document.getElementById('download-count');
