@@ -6,8 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
+  build-mac-arm:
+    runs-on: macos-latest  # Apple Silicon (M1/M2/M3)
     steps:
       - uses: actions/checkout@v4
 
@@ -44,14 +44,61 @@ jobs:
             --icon "EasyTranscribe.app" 150 185 \
             --hide-extension "EasyTranscribe.app" \
             --app-drop-link 450 185 \
-            "EasyTranscribe-Mac.dmg" \
+            "EasyTranscribe-Mac-AppleSilicon.dmg" \
             "dist/EasyTranscribe.app"
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: mac-dmg
-          path: EasyTranscribe-Mac.dmg
+          name: mac-arm-dmg
+          path: EasyTranscribe-Mac-AppleSilicon.dmg
+
+  build-mac-intel:
+    runs-on: macos-13  # Intel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
+
+      - name: Build app
+        run: |
+          pyinstaller \
+            --windowed \
+            --name "EasyTranscribe" \
+            --icon AppIcon.icns \
+            --onedir \
+            --collect-all PyQt6 \
+            editor.py
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "おまかせ文字起こし" \
+            --volicon AppIcon.icns \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 128 \
+            --icon "EasyTranscribe.app" 150 185 \
+            --hide-extension "EasyTranscribe.app" \
+            --app-drop-link 450 185 \
+            "EasyTranscribe-Mac-Intel.dmg" \
+            "dist/EasyTranscribe.app"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-intel-dmg
+          path: EasyTranscribe-Mac-Intel.dmg
 
   build-windows:
     runs-on: windows-latest
@@ -88,7 +135,7 @@ jobs:
           path: EasyTranscribe-Windows.zip
 
   release:
-    needs: [build-mac, build-windows]
+    needs: [build-mac-arm, build-mac-intel, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -100,5 +147,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mac-dmg/EasyTranscribe-Mac.dmg
+            mac-arm-dmg/EasyTranscribe-Mac-AppleSilicon.dmg
+            mac-intel-dmg/EasyTranscribe-Mac-Intel.dmg
             windows-zip/EasyTranscribe-Windows.zip
