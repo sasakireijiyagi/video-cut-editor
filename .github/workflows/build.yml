@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip
+          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
 
       - name: Build app
         run: |
@@ -65,7 +65,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip
+          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
 
       - name: Build exe
         run: |

@@ -600,10 +600,16 @@ class VersionCheckWorker(QThread):
 
     def run(self):
         try:
-            import urllib.request, json
+            import urllib.request, json, ssl
             url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
             req = urllib.request.Request(url, headers={"User-Agent": "EasyTranscribe"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            # PyInstallerバンドル環境でのSSL証明書問題を回避
+            try:
+                import certifi
+                ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
                 data = json.loads(resp.read())
             tag = data.get("tag_name", "")
             html_url = data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases")
