@@ -140,11 +140,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
+      - name: Download mac-arm artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: 'mac-arm-dmg|windows-zip'
-          merge-multiple: true
+          name: mac-arm-dmg
+
+      - name: Download windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-zip
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
