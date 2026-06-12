@@ -146,6 +146,30 @@
     }
 
     /* ── Screenshot ── */
+    .hero-firstrun {
+      max-width: 540px;
+      margin: 1rem auto 0;
+      text-align: left;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 0.3rem 1.1rem;
+    }
+    .hero-firstrun summary {
+      cursor: pointer;
+      color: #888;
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 0.4rem 0;
+    }
+    .hero-firstrun summary:hover { color: #e63946; }
+    .hero-firstrun .frbody { padding: 0.4rem 0.2rem 0.7rem; color: #666; font-size: 0.8rem; line-height: 1.75; }
+    .hero-firstrun ol { margin: 0.6rem 0 0 1.2rem; }
+    .hero-firstrun li { margin-bottom: 0.3rem; }
+    .hero-firstrun a { color: #e63946; text-decoration: none; }
+    .hero-firstrun a:hover { text-decoration: underline; }
+    .hero-firstrun strong { color: #1a1a1a; }
     .screenshot-section {
       max-width: 900px;
       margin: 2rem auto;
@@ -375,6 +399,18 @@
     </div>
     <p class="hero-downloads" id="download-count"></p>
     <p class="hero-readme"><a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.md" target="_blank">使い方を読む →</a></p>
+
+    <details class="hero-firstrun">
+      <summary>Macで「開いていません」と表示されたら</summary>
+      <div class="frbody">
+        <p>署名料（Apple Developer Program）を払っていないため、初回だけ macOS が警告を表示します。<strong>マルウェアが検知されたわけではなく、開発元が証明されていないという意味</strong>です。ソースコードは <a href="https://github.com/sasakireijiyagi/video-cut-editor" target="_blank">GitHub で全公開</a>、外部への通信も一切ありません。</p>
+        <ol>
+        <li>警告画面の「完了」を押す（「ゴミ箱に入れる」は押さない）</li>
+        <li><strong>システム設定 → プライバシーとセキュリティ</strong> を開く</li>
+        <li>下のほうにある「このまま開く」をクリック</li>
+        </ol>
+      </div>
+    </details>
 
     <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">開発を寄付で支援！</a>
   </section>

@@ -18,6 +18,27 @@
 
 ---
 
+## 首次在 Mac 上启动
+
+在 Mac 上首次打开应用时，macOS 可能会显示「**无法打开"EasyTranscribe"**」的警告。
+
+这是因为该应用未通过（付费的）Apple Developer Program 签名。**这不是检测到恶意软件**，只是表示开发者身份未经认证。[源代码已在 GitHub 完全公开](https://github.com/sasakireijiyagi/video-cut-editor)，且不进行任何网络通信，可以放心使用。
+
+**打开方法（macOS Sequoia 及以上）**
+
+1. 在警告窗口点击「**完成**」（不要点击「移到废纸篓」）
+2. 打开 **系统设置 → 隐私与安全性**
+3. 向下滚动并点击「**仍要打开**」
+
+允许一次后，以后即可正常双击启动。
+
+> 如果您熟悉终端，也可以将应用移至「应用程序」后运行：
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/EasyTranscribe.app
+> ```
+
+---
+
 ## 功能概览
 
 ```

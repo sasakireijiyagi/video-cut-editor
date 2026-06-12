@@ -13,6 +13,27 @@ Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/e
 
 ---
 
+## First launch on Mac
+
+The first time you open the app on a Mac, macOS may show a warning that **"EasyTranscribe" cannot be opened**.
+
+This appears because the app isn't signed through the (paid) Apple Developer Program. **It is not a malware detection** — it only means the developer isn't certified. The [source is fully public on GitHub](https://github.com/sasakireijiyagi/video-cut-editor) and the app makes no network connections, so it's safe to use.
+
+**How to open (macOS Sequoia and later)**
+
+1. Click **Done** in the dialog (do NOT click "Move to Trash")
+2. Open **System Settings → Privacy & Security**
+3. Scroll down and click **Open Anyway**
+
+Once allowed, the app opens normally with a double-click from then on.
+
+> If you're comfortable with the Terminal, you can also move the app to Applications and run:
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/EasyTranscribe.app
+> ```
+
+---
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
 
 If this tool is useful to you, please give it a **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** — it really helps!
