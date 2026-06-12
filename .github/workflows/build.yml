@@ -135,18 +135,36 @@ jobs:
           path: EasyTranscribe-Windows.zip
 
   release:
-    needs: [build-mac-arm, build-mac-intel, build-windows]
+    needs: [build-mac-arm, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
+        with:
+          pattern: 'mac-arm-dmg|windows-zip'
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            mac-arm-dmg/EasyTranscribe-Mac-AppleSilicon.dmg
-            mac-intel-dmg/EasyTranscribe-Mac-Intel.dmg
-            windows-zip/EasyTranscribe-Windows.zip
+            EasyTranscribe-Mac-AppleSilicon.dmg
+            EasyTranscribe-Windows.zip
+
+  release-intel:
+    needs: [release, build-mac-intel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Intel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-intel-dmg
+
+      - name: Upload Intel DMG to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: EasyTranscribe-Mac-Intel.dmg
