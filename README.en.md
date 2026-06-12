@@ -275,6 +275,12 @@ Free to use, modify, and distribute. Please retain the copyright notice.
 
 ---
 
+## About development
+
+This tool was conceived, designed, and directed by the author, with implementation developed using the assistance of **Claude (Anthropic)**.
+
+---
+
 ## Feedback & Bug Reports
 
 Feel free to share how you use it, suggestions, or bug reports via **[GitHub Issues](https://github.com/sasakireijiyagi/video-cut-editor/issues)**. English or Japanese, either is fine.
