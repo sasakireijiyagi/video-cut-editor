@@ -1038,8 +1038,13 @@ class WhisperWorker(QThread):
         self._proc        = None
 
     def cancel(self):
-        if self._proc:
-            self._proc.terminate()
+        p = self._proc
+        if p and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                p.kill()   # SIGTERMで死ななければ強制終了（ゾンビ化防止）
 
     def run(self):
         outdir = str(Path(self.video).parent)
@@ -1051,10 +1056,14 @@ class WhisperWorker(QThread):
             cmd += ['--language', self.language]
 
         self.log.emit(f"Whisper: model={self.model}  lang={self.language}")
+        self.log.emit('モデル読み込み中…（初回は10〜30秒ほどかかります）'
+                      if _lang == 'ja' else
+                      'Loading model… (the first run takes 10–30 seconds)')
 
         env = os.environ.copy()
         if sys.platform != 'win32':
             env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        env['PYTHONUNBUFFERED'] = '1'   # whisperの進捗をリアルタイム表示（バッファ無効化）
 
         try:
             self._proc = subprocess.Popen(
@@ -1139,8 +1148,13 @@ class BatchWhisperWorker(QThread):
 
     def cancel(self):
         self._stop = True
-        if self._proc:
-            self._proc.terminate()
+        p = self._proc
+        if p and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                p.kill()   # SIGTERMで死ななければ強制終了（ゾンビ化防止）
 
     def add_files(self, paths: List[str]):
         """実行中に追加ファイルをキューへ積む（スレッドセーフ: list.append はGIL保護）"""
@@ -1153,6 +1167,7 @@ class BatchWhisperWorker(QThread):
         env     = os.environ.copy()
         if sys.platform != 'win32':
             env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        env['PYTHONUNBUFFERED'] = '1'   # whisperの進捗をリアルタイム表示（バッファ無効化）
 
         i = 0
         while i < len(self.files):
@@ -1162,6 +1177,9 @@ class BatchWhisperWorker(QThread):
             total = len(self.files)  # 追加分を反映
 
             self.file_started.emit(i + 1, total, Path(video).name)
+            self.log.emit('モデル読み込み中…（初回は10〜30秒ほどかかります）'
+                          if _lang == 'ja' else
+                          'Loading model… (the first run takes 10–30 seconds)')
 
             outdir = str(Path(video).parent)
             cmd = [WHISPER_BIN, video,
@@ -1437,6 +1455,13 @@ class BatchDialog(QDialog):
         if self._worker:
             self._worker.cancel()
         self.btn_cancel.setEnabled(False)
+
+    def closeEvent(self, event):
+        # ダイアログを閉じたら実行中のwhisperを確実に止める（ゾンビ化防止）
+        if self._worker and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait(5000)
+        super().closeEvent(event)
 
     def _update_progress(self):
         # 全体進捗 = (完了ファイル数 + 処理中ファイルのじわ進み) / 総数
@@ -3192,6 +3217,14 @@ class MainWindow(QMainWindow):
     def _cancel(self):
         if self.worker:
             self.worker.cancel()
+
+    def closeEvent(self, event):
+        # アプリ終了時、実行中のworker（whisper/ffmpeg）を確実に止める（ゾンビ化防止）
+        for w in (getattr(self, 'whisper_worker', None), getattr(self, 'worker', None)):
+            if w and w.isRunning():
+                w.cancel()
+                w.wait(5000)
+        super().closeEvent(event)
 
     def _on_done(self, ok: bool, msg: str):
         self.btn_exec.setEnabled(True)
