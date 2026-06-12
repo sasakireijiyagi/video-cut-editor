@@ -22,7 +22,7 @@
 
 在 Mac 上首次打开应用时，macOS 可能会显示「**无法打开"EasyTranscribe"**」的警告。
 
-这是因为该应用未通过（付费的）Apple Developer Program 签名。**这不是检测到恶意软件**，只是表示开发者身份未经认证。[源代码已在 GitHub 完全公开](https://github.com/sasakireijiyagi/video-cut-editor)，且不进行任何网络通信，可以放心使用。
+这是因为该应用未经 Apple 签名和公证。**这不是检测到恶意软件**，只是表示开发者身份未经认证。[源代码已在 GitHub 完全公开](https://github.com/sasakireijiyagi/video-cut-editor)，且不进行任何网络通信，可以放心使用。
 
 **打开方法（macOS Sequoia 及以上）**
 

@@ -22,7 +22,7 @@
 
 Mac에서 앱을 처음 열면 「**"EasyTranscribe"를 열 수 없습니다**」라는 경고가 표시될 수 있습니다.
 
-이는 이 앱이 유료 Apple Developer Program으로 서명되지 않았기 때문에 나타나는 것으로, **악성코드가 감지된 것이 아니라** 개발자 인증이 없다는 의미입니다. [소스 코드는 GitHub에 전체 공개](https://github.com/sasakireijiyagi/video-cut-editor)되어 있으며 외부 통신도 전혀 하지 않으므로 안심하고 사용하셔도 됩니다.
+이는 이 앱이 Apple의 서명·공증을 거치지 않았기 때문에 나타나는 것으로, **악성코드가 감지된 것이 아니라** 개발자 인증이 없다는 의미입니다. [소스 코드는 GitHub에 전체 공개](https://github.com/sasakireijiyagi/video-cut-editor)되어 있으며 외부 통신도 전혀 하지 않으므로 안심하고 사용하셔도 됩니다.
 
 **여는 방법 (macOS Sequoia 이상)**
 
