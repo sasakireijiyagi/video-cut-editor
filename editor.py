@@ -322,6 +322,67 @@ def _find_whisper() -> str:
 FFMPEG_BIN  = _find_ffmpeg()
 WHISPER_BIN = _find_whisper()
 
+
+# ── クラウド同期ファイル（Dropbox等）のダウンロード検知・実体化 ──
+_SF_DATALESS = 0x40000000   # macOS: 実体がまだローカルに無い（クラウド上のみ）
+
+def _is_dataless(path: str) -> bool:
+    """Dropbox等のオンラインのみファイル（実体未ダウンロード）かを判定。"""
+    try:
+        flags = os.stat(path).st_flags  # macOSのみst_flagsを持つ
+        return bool(flags & _SF_DATALESS)
+    except (AttributeError, OSError):
+        return False
+
+def _materialize(path: str, progress_cb=None, should_stop=None):
+    """クラウド上のファイルを読み込んでローカルに実体化する。
+    progress_cb(percent:int) で進捗を通知。should_stop() がTrueなら中断。"""
+    try:
+        total = os.path.getsize(path)
+    except OSError:
+        total = 0
+    read = 0
+    chunk = 8 * 1024 * 1024  # 8MB
+    last_pct = -1
+    with open(path, 'rb') as f:
+        while True:
+            if should_stop and should_stop():
+                return
+            buf = f.read(chunk)
+            if not buf:
+                break
+            read += len(buf)
+            if progress_cb and total > 0:
+                pct = int(read * 100 / total)
+                if pct != last_pct:
+                    last_pct = pct
+                    progress_cb(pct)
+
+
+def _media_duration(path: str) -> float:
+    """動画/音声の長さ（秒）をffmpegで取得。取れなければ0.0。"""
+    try:
+        r = subprocess.run([FFMPEG_BIN, '-i', path],
+                           capture_output=True, text=True, timeout=30)
+        m = re.search(r'Duration:\s*(\d+):(\d+):(\d+\.?\d*)', r.stderr)
+        if m:
+            h, mn, s = m.groups()
+            return int(h) * 3600 + int(mn) * 60 + float(s)
+    except Exception:
+        pass
+    return 0.0
+
+
+def _parse_whisper_ts(line: str) -> float:
+    """whisperの出力行 '[00:31.000 --> 00:41.000] ...' から終了秒を取り出す。
+    取れなければ-1.0。HH:MM:SS.mmm / MM:SS.mmm 両対応。"""
+    m = re.search(r'-->\s*(?:(\d+):)?(\d+):(\d+\.?\d*)', line)
+    if not m:
+        return -1.0
+    h, mn, s = m.groups()
+    return (int(h) if h else 0) * 3600 + int(mn) * 60 + float(s)
+
+
 def _is_ffmpeg_ok() -> bool:
     try:
         subprocess.run([FFMPEG_BIN, '-version'], capture_output=True, timeout=5)
@@ -1048,6 +1109,19 @@ class WhisperWorker(QThread):
 
     def run(self):
         outdir = str(Path(self.video).parent)
+
+        # Dropbox等のクラウドファイルなら、まず実体をダウンロード
+        if _is_dataless(self.video):
+            self.log.emit('📥 Dropboxからダウンロード中…' if _lang == 'ja'
+                          else '📥 Downloading from Dropbox…')
+            _last = [-1]
+            def _dl(pct):
+                if pct // 10 != _last[0] // 10:   # 10%刻みでログ
+                    _last[0] = pct
+                    self.log.emit(f'📥 {pct}%')
+            _materialize(self.video, progress_cb=_dl)
+            self.log.emit('📥 ダウンロード完了' if _lang == 'ja' else '📥 Download complete')
+
         cmd = [WHISPER_BIN, self.video,
                '--model', self.model,
                '--output_format', 'srt',
@@ -1134,6 +1208,11 @@ class BatchWhisperWorker(QThread):
     log           = pyqtSignal(str)
     all_done      = pyqtSignal(int, int)        # success_count, total
     seg_tick      = pyqtSignal()                # whisperが1区間出力するたび（進捗の鼓動）
+    dl_start      = pyqtSignal(str)             # Dropbox等のDL開始（filename）
+    dl_progress   = pyqtSignal(int)             # DL進捗（0-100）
+    dl_done       = pyqtSignal()                # DL完了
+    file_duration = pyqtSignal(float)           # 現ファイルの長さ（秒）
+    seg_progress  = pyqtSignal(float)           # 処理済みの最新タイムスタンプ（秒）
 
     def __init__(self, files: List[str], model: str, language: str,
                  mark_silence: bool, silence_sec: float):
@@ -1177,6 +1256,23 @@ class BatchWhisperWorker(QThread):
             total = len(self.files)  # 追加分を反映
 
             self.file_started.emit(i + 1, total, Path(video).name)
+
+            # ① Dropbox等のクラウドファイルなら、まず実体をダウンロード
+            if _is_dataless(video):
+                self.dl_start.emit(Path(video).name)
+                self.log.emit('📥 Dropboxからダウンロード中…' if _lang == 'ja'
+                              else '📥 Downloading from Dropbox…')
+                _materialize(video,
+                             progress_cb=lambda pct: self.dl_progress.emit(pct),
+                             should_stop=lambda: self._stop)
+                self.dl_done.emit()
+                if self._stop:
+                    break
+
+            # ② 動画の長さを取得（進捗計算用）
+            dur = _media_duration(video)
+            self.file_duration.emit(dur)
+
             self.log.emit('モデル読み込み中…（初回は10〜30秒ほどかかります）'
                           if _lang == 'ja' else
                           'Loading model… (the first run takes 10–30 seconds)')
@@ -1199,6 +1295,9 @@ class BatchWhisperWorker(QThread):
                         self.log.emit(line)
                         if '-->' in line:        # whisperの区間出力行＝進捗の鼓動
                             self.seg_tick.emit()
+                            ts = _parse_whisper_ts(line)
+                            if ts >= 0:
+                                self.seg_progress.emit(ts)
                 self._proc.wait()
             except Exception as exc:
                 self.file_done.emit(i + 1, total, False, str(exc))
@@ -1340,6 +1439,12 @@ class BatchDialog(QDialog):
         self.lbl_current.setVisible(False)
         vbox.addWidget(self.lbl_current)
 
+        # 現ファイルの詳細（タイムスタンプ進捗・経過時間）— 「動いてる」感を出す
+        self.lbl_detail = QLabel('')
+        self.lbl_detail.setVisible(False)
+        self.lbl_detail.setStyleSheet('color: #888; font-size: 11px;')
+        vbox.addWidget(self.lbl_detail)
+
         self.progress = QProgressBar()
         self.progress.setVisible(False)
         self.progress.setTextVisible(False)
@@ -1437,18 +1542,31 @@ class BatchDialog(QDialog):
         self._worker.seg_tick.connect(self._on_seg_tick)
         self._worker.log.connect(self.log.append)
         self._worker.all_done.connect(self._on_all_done)
+        self._worker.dl_start.connect(self._on_dl_start)
+        self._worker.dl_progress.connect(self._on_dl_progress)
+        self._worker.dl_done.connect(self._on_dl_done)
+        self._worker.file_duration.connect(self._on_file_duration)
+        self._worker.seg_progress.connect(self._on_seg_progress)
 
         self.progress.setRange(0, 1000)
         self.progress.setValue(0)
         self._creep = 0.0
+        self._cur_dur = 0.0      # 現ファイルの長さ（秒）
+        self._cur_pos = 0.0      # 処理済みの最新タイムスタンプ（秒）
+        self._downloading = False
         self.progress.setVisible(True)
         self.lbl_current.setVisible(True)
+        self.lbl_detail.setVisible(True)
         self.btn_start.setEnabled(False)
         self.btn_cancel.setEnabled(True)
         self.btn_remove.setEnabled(False)
         self.btn_clear.setEnabled(False)
         self._batch_start_time = None
         self._file_start_time  = None
+        # 1秒ごとに経過時間を更新（区間が出ない間も「動いてる」のが見える）
+        self._tick_timer = QTimer(self)
+        self._tick_timer.timeout.connect(self._on_heartbeat)
+        self._tick_timer.start(1000)
         self._worker.start()
 
     def _cancel(self):
@@ -1458,28 +1576,91 @@ class BatchDialog(QDialog):
 
     def closeEvent(self, event):
         # ダイアログを閉じたら実行中のwhisperを確実に止める（ゾンビ化防止）
+        if getattr(self, '_tick_timer', None):
+            self._tick_timer.stop()
         if self._worker and self._worker.isRunning():
             self._worker.cancel()
             self._worker.wait(5000)
         super().closeEvent(event)
 
+    @staticmethod
+    def _fmt_time(sec: float) -> str:
+        sec = int(max(0, sec))
+        h, m, s = sec // 3600, (sec % 3600) // 60, sec % 60
+        return f'{h}:{m:02d}:{s:02d}' if h else f'{m}:{s:02d}'
+
     def _update_progress(self):
-        # 全体進捗 = (完了ファイル数 + 処理中ファイルのじわ進み) / 総数
+        # 全体進捗 = (完了ファイル数 + 現ファイルの進み) / 総数
         cur, total = self._cur_file, max(self._cur_total, 1)
-        overall = ((cur - 1) + self._creep) / total if cur > 0 else 0.0
+        if self._cur_dur > 0:                       # 長さが分かれば実数で
+            frac = min(0.99, self._cur_pos / self._cur_dur)
+        else:                                       # 不明ならじわ進みで代替
+            frac = self._creep
+        overall = ((cur - 1) + frac) / total if cur > 0 else 0.0
         self.progress.setValue(max(0, min(1000, int(overall * 1000))))
 
+    def _update_detail(self):
+        import time
+        if self._downloading:
+            return
+        parts = []
+        if self._cur_dur > 0:
+            pct = int(min(99, self._cur_pos / self._cur_dur * 100))
+            parts.append(f'{self._fmt_time(self._cur_pos)} / {self._fmt_time(self._cur_dur)} ({pct}%)')
+        elif self._cur_pos > 0:
+            parts.append(self._fmt_time(self._cur_pos))
+        if self._file_start_time:
+            el = time.time() - self._file_start_time
+            parts.append(('経過 ' if _lang == 'ja' else 'elapsed ') + self._fmt_time(el))
+        self.lbl_detail.setText('   ↳ ' + '   '.join(parts) if parts else '')
+
     def _on_seg_tick(self):
-        # whisperが1区間出すたびに、現ファイル分(上限0.95)へ向けてじわっと前進
+        # whisperが1区間出すたびに、現ファイル分(上限0.95)へ向けてじわっと前進（長さ不明時のフォールバック）
         self._creep += (0.95 - self._creep) * 0.06
         self._update_progress()
+
+    def _on_seg_progress(self, ts: float):
+        # 処理済みの最新タイムスタンプ＝実進捗
+        self._cur_pos = ts
+        self._update_progress()
+        self._update_detail()
+
+    def _on_file_duration(self, dur: float):
+        self._cur_dur = dur
+        self._update_detail()
+
+    def _on_dl_start(self, name: str):
+        self._downloading = True
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.lbl_detail.setText('   📥 Dropboxからダウンロード中… 0%' if _lang == 'ja'
+                                else '   📥 Downloading from Dropbox… 0%')
+
+    def _on_dl_progress(self, pct: int):
+        self.progress.setValue(pct)
+        self.lbl_detail.setText((f'   📥 Dropboxからダウンロード中… {pct}%' if _lang == 'ja'
+                                 else f'   📥 Downloading from Dropbox… {pct}%'))
+
+    def _on_dl_done(self):
+        self._downloading = False
+        self.progress.setRange(0, 1000)
+        self._update_progress()
+        self.lbl_detail.setText('')
+
+    def _on_heartbeat(self):
+        # 区間が出ない間も経過時間を更新（固まってないことを示す）
+        if not self._downloading:
+            self._update_detail()
 
     def _on_file_started(self, current: int, total: int, name: str):
         import time
         self._cur_file  = current
         self._cur_total = total
         self._creep     = 0.0
+        self._cur_dur   = 0.0       # 新ファイル開始：進捗をリセット
+        self._cur_pos   = 0.0
         self._update_progress()
+        self._update_detail()
         if self._batch_start_time is None:
             self._batch_start_time = time.time()
         self._file_start_time = time.time()
@@ -1516,6 +1697,8 @@ class BatchDialog(QDialog):
                 self.lbl_current.setText(current_text + eta)
 
     def _on_all_done(self, success: int, total: int):
+        if getattr(self, '_tick_timer', None):
+            self._tick_timer.stop()
         self.btn_start.setEnabled(True)
         self.btn_cancel.setEnabled(False)
         self.btn_remove.setEnabled(True)
@@ -1524,6 +1707,7 @@ class BatchDialog(QDialog):
         self.progress.setRange(0, 1000)
         self.progress.setValue(1000)
         self.lbl_current.setVisible(False)
+        self.lbl_detail.setVisible(False)
         msg = (f"完了: {success}/{total} ファイル処理しました"
                if _lang == 'ja' else f"Done: {success}/{total} files processed.")
         self.log.append(f"\n{'='*40}\n{msg}")
