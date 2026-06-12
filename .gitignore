@@ -18,3 +18,14 @@ promo_slides.py
 promo_tts.py
 make_promo.py
 make_promo_video.md
+
+# --- 秘密情報の保護（うっかりコミット防止）---
+.env
+.env.*
+.streamlit/secrets.toml
+secrets.toml
+*.pem
+*.key
+credentials.json
+service-account*.json
+*_credentials*
