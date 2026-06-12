@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyTranscribe — Free Local Video Transcription Tool | Open Video, Press Button, Done</title>
+  <meta name="description" content="Open a video and press a button. Free, fully local transcription powered by OpenAI Whisper. Supports 100 languages. No cloud, no subscription. Mac & Windows installer included.">
+  <meta name="keywords" content="transcription,automatic transcription,Whisper,free,local,video,subtitles,interview,lecture,meeting,Mac,Windows,EasyTranscribe">
+  <meta name="google-site-verification" content="X27hTtGK0DeluBd_bZirCDejo-S46s7V5m6wwHhLbis">
+  <link rel="canonical" href="https://sasakireijiyagi.github.io/video-cut-editor/en.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sasakireijiyagi.github.io/video-cut-editor/en.html">
+  <meta property="og:title" content="EasyTranscribe — Free Local Video Transcription Tool">
+  <meta property="og:description" content="Open a video and press a button. Free, fully local transcription powered by OpenAI Whisper. 100 languages. Mac & Windows.">
+  <meta property="og:image" content="https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EasyTranscribe — Free Local Video Transcription Tool">
+  <meta name="twitter:description" content="Open a video and press a button. Free, fully local transcription powered by OpenAI Whisper. 100 languages. Mac & Windows.">
+  <meta name="twitter:image" content="https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f9f9f9;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    /* ── Lang switcher ── */
+    .lang-bar {
+      text-align: right;
+      padding: 0.6rem 1.5rem;
+      font-size: 0.8rem;
+    }
+    .lang-bar a { color: #999; text-decoration: none; }
+    .lang-bar a:hover { color: #e63946; }
+    .lang-bar .active { color: #e63946; font-weight: 600; }
+
+    /* ── Hero ── */
+    .hero {
+      background: #f9f9f9;
+      text-align: center;
+      padding: 2rem 2rem 2rem;
+    }
+
+    .hero-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .hero-title img {
+      width: 56px;
+      height: 56px;
+    }
+
+    .hero-title h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #1a1a1a;
+    }
+
+    .hero-en {
+      font-size: 0.9rem;
+      color: #999;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-tagline {
+      font-size: 1.1rem;
+      color: #444;
+      margin-bottom: 1.8rem;
+      line-height: 1.8;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem 2rem;
+      width: 260px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    .btn-mac { background: #e63946; color: #fff; }
+    .btn-mac-intel { background: #c0392b; color: #fff; }
+    .btn-win { background: #1a1a1a; color: #fff; }
+
+    .hero-note {
+      font-size: 0.8rem;
+      color: #999;
+    }
+    .hero-downloads {
+      margin-top: 0.8rem;
+      font-size: 0.8rem;
+      color: #999;
+      letter-spacing: 0.04em;
+    }
+    .hero-downloads span {
+      color: #e63946;
+      font-weight: 700;
+    }
+    .hero-readme {
+      margin-top: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .hero-readme a {
+      color: #e63946;
+      text-decoration: none;
+      border-bottom: 1px solid #e6394640;
+      padding-bottom: 1px;
+    }
+    .hero-readme a:hover {
+      border-bottom-color: #e63946;
+    }
+
+    /* ── Screenshot ── */
+    .hero-firstrun {
+      max-width: 540px;
+      margin: 1rem auto 0;
+      text-align: left;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 0.3rem 1.1rem;
+    }
+    .hero-firstrun summary {
+      cursor: pointer;
+      color: #888;
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 0.4rem 0;
+    }
+    .hero-firstrun summary:hover { color: #e63946; }
+    .hero-firstrun .frbody { padding: 0.4rem 0.2rem 0.7rem; color: #666; font-size: 0.8rem; line-height: 1.75; }
+    .hero-firstrun ol { margin: 0.6rem 0 0 1.2rem; }
+    .hero-firstrun li { margin-bottom: 0.3rem; }
+    .hero-firstrun a { color: #e63946; text-decoration: none; }
+    .hero-firstrun a:hover { text-decoration: underline; }
+    .hero-firstrun strong { color: #1a1a1a; }
+    .screenshot-section {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+    .screenshot-section img {
+      width: 100%;
+      border-radius: 14px;
+      box-shadow: 0 12px 48px rgba(44, 62, 80, 0.14);
+      border: 1px solid #e8e8e8;
+    }
+
+    /* ── Features ── */
+    .features-section {
+      max-width: 900px;
+      margin: 0 auto 3rem;
+      padding: 0 2rem;
+    }
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #999;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .feature {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 1.6rem;
+      transition: box-shadow 0.15s;
+    }
+    .feature:hover { box-shadow: 0 4px 20px rgba(44,62,80,0.08); }
+    .feature-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #e63946;
+      margin-bottom: 0.5rem;
+    }
+    .feature h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 0.4rem;
+    }
+    .feature p {
+      font-size: 0.82rem;
+      color: #666;
+      line-height: 1.65;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 2.5rem 2rem;
+      font-size: 0.82rem;
+      color: #999;
+    }
+    footer a { color: #e63946; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .btn-donate {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.6rem 1.6rem;
+      border: 1.5px solid #e63946;
+      border-radius: 6px;
+      color: #e63946;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-donate:hover { background: #e63946; color: #fff; }
+    .footer-divider { margin: 0 0.5rem; opacity: 0.4; }
+    .citation-section { max-width: 900px; margin: 0 auto 3rem; padding: 0 2rem; }
+    .citation-box { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.6rem 2rem; }
+    .citation-box p { font-size: 0.82rem; color: #666; line-height: 1.8; font-family: 'Georgia', serif; }
+    .citation-box a { color: #e63946; text-decoration: none; }
+    .citation-box a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="lang-bar">
+    <a href="index.html">日本語</a>
+    &nbsp;|&nbsp;
+    <span class="active">English</span>
+    &nbsp;|&nbsp;
+    <a href="ko.html">한국어</a>
+    &nbsp;|&nbsp;
+    <a href="zh.html">中文</a>
+  </div>
+
+  <section class="hero">
+    <div class="hero-title">
+      <img src="AppIcon.png" alt="icon">
+      <h1>EasyTranscribe</h1>
+    </div>
+    <p class="hero-en">おまかせ文字起こし</p>
+    <p class="hero-tagline">
+      Just open a video and press a button.<br>
+      Free, fully local transcription — no cloud, no subscription.
+    </p>
+    <div class="hero-buttons">
+      <a class="btn btn-mac" href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Mac-AppleSilicon.dmg">
+        Mac
+      </a>
+      <a class="btn btn-win" href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Windows.zip">
+        Windows
+      </a>
+    </div>
+    <p class="hero-downloads" id="download-count"></p>
+    <p class="hero-readme"><a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.en.md" target="_blank">How to use →</a></p>
+
+    <details class="hero-firstrun">
+      <summary>If macOS says the app "cannot be opened"</summary>
+      <div class="frbody">
+        <p>Because this app isn’t signed or notarized by Apple, macOS shows a warning the first time. <strong>This is not a malware detection</strong> — it only means the developer isn’t certified. The <a href="https://github.com/sasakireijiyagi/video-cut-editor" target="_blank">source is fully public on GitHub</a> and the app makes no network connections.</p>
+        <ol>
+        <li>Click "Done" in the dialog (do NOT click "Move to Trash")</li>
+        <li>Open <strong>System Settings → Privacy &amp; Security</strong></li>
+        <li>Scroll down and click "Open Anyway"</li>
+        </ol>
+      </div>
+    </details>
+
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">Support Development</a>
+  </section>
+
+  <div class="screenshot-section">
+    <img src="screenshot.png" alt="EasyTranscribe screenshot">
+  </div>
+
+  <section class="features-section">
+    <p class="section-label">Features</p>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-label">Transcription</div>
+        <h3>High-accuracy transcription</h3>
+        <p>Powered by OpenAI Whisper. Supports 100 languages — lectures, meetings, interviews.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Editing</div>
+        <h3>Easy edit &amp; cut</h3>
+        <p>Select SRT segments and cut with ffmpeg. Fine-tune start/end times with precision controls.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Batch</div>
+        <h3>Batch transcription</h3>
+        <p>Queue multiple files. Add more while running. Shows estimated time remaining.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Filler Cut</div>
+        <h3>Filler word removal</h3>
+        <p>Auto-detect and remove filler words in 8 languages. Fully customizable word list.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Subtitle</div>
+        <h3>Subtitle burn-in</h3>
+        <p>Bold white text with black outline, burned directly into the video. Auto-detects vertical video.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Export</div>
+        <h3>EAF export</h3>
+        <p>Export as EAF files for ELAN — the linguistic annotation tool. Great for research use.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="citation-section">
+    <p class="section-label">Citation</p>
+    <div class="citation-box">
+      <p>If you use this tool in your research, please cite it as:</p>
+      <br>
+      <p>Sasaki, R. (2026). EasyTranscribe [Computer software]. <a href="https://doi.org/10.5281/zenodo.20515527" target="_blank">https://doi.org/10.5281/zenodo.20515527</a></p>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/sasakireijiyagi/video-cut-editor">GitHub</a>
+    <span class="footer-divider">|</span>
+    <a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.en.md">How to use</a>
+    <span class="footer-divider">|</span>
+    MIT License
+    <span class="footer-divider">|</span>
+    <a href="https://sasakireijiyagi.com/home" target="_blank">Reiji Sasaki (Yagi Productions)</a>
+    <br><br>
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">Support Development</a>
+    <br><br>
+    <span style="font-size:0.76rem; opacity:0.7;">Developed with the assistance of Claude (Anthropic)</span>
+  </footer>
+
+<script>
+  fetch('downloads.json?v=' + Date.now())
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('download-count');
+      if (el && d.total > 0) el.innerHTML = 'Downloads <span>' + d.total.toLocaleString() + '</span>';
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
