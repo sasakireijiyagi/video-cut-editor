@@ -2125,25 +2125,62 @@ class NudgeTimeCommand(QUndoCommand):
         self.col       = col
         self.delta_ms  = delta_ms
 
-    def _apply(self, delta: int):
-        entry = self.srt_table.entries[self.row]
-        if self.col == 1:
-            entry.start_ms = max(0, entry.start_ms + delta)
-            ms = entry.start_ms
-        else:
-            entry.end_ms = max(0, entry.end_ms + delta)
-            ms = entry.end_ms
-        self.srt_table.tbl.blockSignals(True)
-        item = self.srt_table.tbl.item(self.row, self.col)
-        if item:
-            item.setText(_ms_to_srt(ms))
-        self.srt_table.tbl.blockSignals(False)
+        self._before = None   # {row_idx: (start_ms, end_ms)} 復元用
 
     def redo(self):
-        self._apply(self.delta_ms)
+        st   = self.srt_table
+        ents = st.entries
+        if self.row >= len(ents):
+            self._before = {}
+            return
+        e = ents[self.row]
+        snap = {}
+        def remember(i):
+            if i not in snap:
+                snap[i] = (ents[i].start_ms, ents[i].end_ms)
+        remember(self.row)
+        if self.col == 1:                                   # 開始時間
+            new_start = max(0, e.start_ms + self.delta_ms)
+            new_start = min(new_start, e.end_ms)            # 自分の終了は超えない
+            if self.delta_ms < 0 and self.row > 0:          # 前倒し → 前行の終了を連動
+                prev = ents[self.row - 1]
+                new_start = max(new_start, prev.start_ms)   # 前行の開始より前へは行かない
+                if prev.end_ms > new_start:
+                    remember(self.row - 1)
+                    prev.end_ms = new_start
+            e.start_ms = new_start
+        else:                                               # 終了時間
+            new_end = max(0, e.end_ms + self.delta_ms)
+            new_end = max(new_end, e.start_ms)              # 自分の開始は下回らない
+            if self.delta_ms > 0 and self.row < len(ents) - 1:  # 後倒し → 次行の開始を連動
+                nxt = ents[self.row + 1]
+                new_end = min(new_end, nxt.end_ms)          # 次行の終了より後へは行かない
+                if nxt.start_ms < new_end:
+                    remember(self.row + 1)
+                    nxt.start_ms = new_end
+            e.end_ms = new_end
+        self._before = snap
+        self._refresh(snap.keys())
 
     def undo(self):
-        self._apply(-self.delta_ms)
+        st = self.srt_table
+        for i, (s, en) in (self._before or {}).items():
+            st.entries[i].start_ms = s
+            st.entries[i].end_ms   = en
+        self._refresh((self._before or {}).keys())
+
+    def _refresh(self, rows):
+        tbl = self.srt_table.tbl
+        tbl.blockSignals(True)
+        for i in rows:
+            e = self.srt_table.entries[i]
+            it1 = tbl.item(i, 1)
+            it2 = tbl.item(i, 2)
+            if it1:
+                it1.setText(_ms_to_srt(e.start_ms))
+            if it2:
+                it2.setText(_ms_to_srt(e.end_ms))
+        tbl.blockSignals(False)
 
 
 class EditTimeCommand(QUndoCommand):
@@ -2329,6 +2366,52 @@ def _make_eaf(entries: List['SRTEntry'], video_path: str, tier_name: str) -> str
         '</ANNOTATION_DOCUMENT>',
     ]
     return '\n'.join(lines)
+
+
+class InsertRowCommand(QUndoCommand):
+    """指定位置に1行（空テキスト）を挿入する。"""
+    def __init__(self, srt_table, at_row: int, entry: 'SRTEntry'):
+        super().__init__("行を挿入" if _lang == 'ja' else "Insert row")
+        self.srt_table = srt_table
+        self.at_row    = at_row
+        self.entry     = entry
+
+    def redo(self):
+        st = self.srt_table
+        st.entries.insert(self.at_row, self.entry)
+        _reindex(st.entries)
+        st._repopulate()
+
+    def undo(self):
+        st = self.srt_table
+        del st.entries[self.at_row]
+        _reindex(st.entries)
+        st._repopulate()
+
+
+class DeleteRowsCommand(QUndoCommand):
+    """選択行を削除する（Undoで元の位置に復元）。"""
+    def __init__(self, srt_table, rows):
+        rows = sorted(rows)
+        super().__init__(f"削除 ({len(rows)}行)" if _lang == 'ja' else f"Delete ({len(rows)} rows)")
+        self.srt_table = srt_table
+        self.rows      = rows
+        self._saved    = None   # [(row_idx, entry), ...] 昇順
+
+    def redo(self):
+        st = self.srt_table
+        self._saved = [(r, st.entries[r]) for r in self.rows]
+        for r in reversed(self.rows):
+            del st.entries[r]
+        _reindex(st.entries)
+        st._repopulate()
+
+    def undo(self):
+        st = self.srt_table
+        for r, e in self._saved:           # 昇順に挿入し直す
+            st.entries.insert(r, e)
+        _reindex(st.entries)
+        st._repopulate()
 
 
 def _reindex(entries: List['SRTEntry']):
@@ -2521,9 +2604,9 @@ class SRTTable(QWidget):
         vbox.addWidget(self.tbl)
 
         # 操作ヒント（薄く常時表示。デザインは変えず、気づける程度に）
-        hint = QLabel('S 分割   Z 前と統合   C 次と統合   X ✓   D 編集   ↑↓ 移動   （右クリックでも操作可）'
+        hint = QLabel('S 分割   Z 前と統合   C 次と統合   I 挿入   Del 削除   X ✓   D 編集   ↑↓ 移動   （右クリックでも操作可）'
                       if _lang == 'ja' else
-                      'S split   Z merge w/prev   C merge w/next   X check   D edit   ↑↓ move   (right-click too)')
+                      'S split   Z merge w/prev   C merge w/next   I insert   Del delete   X check   D edit   ↑↓ move   (right-click too)')
         hint.setStyleSheet('color: #999; font-size: 11px; padding: 2px 2px 0 2px;')
         vbox.addWidget(hint)
 
@@ -2539,6 +2622,9 @@ class SRTTable(QWidget):
         QShortcut(QKeySequence('C'), self).activated.connect(self._merge_next)
         QShortcut(QKeySequence('S'), self).activated.connect(lambda: self._split_row(self.tbl.currentRow()))
         QShortcut(QKeySequence('D'), self).activated.connect(self._enter_edit_mode)
+        QShortcut(QKeySequence('I'), self).activated.connect(self._insert_row)
+        QShortcut(QKeySequence('Delete'), self).activated.connect(self._delete_rows)
+        QShortcut(QKeySequence('Backspace'), self).activated.connect(self._delete_rows)
 
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
@@ -2690,15 +2776,23 @@ class SRTTable(QWidget):
     def _on_context_menu(self, pos):
         selected_rows = sorted({idx.row() for idx in self.tbl.selectedIndexes()})
         menu = QMenu(self)
-        act_split = menu.addAction('✂ 行を分割…' if _lang == 'ja' else '✂ Split row…')
-        act_merge = menu.addAction('⊕ 選択行を統合' if _lang == 'ja' else '⊕ Merge selected rows')
+        act_split  = menu.addAction('✂ 行を分割…' if _lang == 'ja' else '✂ Split row…')
+        act_merge  = menu.addAction('⊕ 選択行を統合' if _lang == 'ja' else '⊕ Merge selected rows')
+        menu.addSeparator()
+        act_insert = menu.addAction('＋ 行を挿入 (I)' if _lang == 'ja' else '＋ Insert row (I)')
+        act_delete = menu.addAction('🗑 選択行を削除 (Del)' if _lang == 'ja' else '🗑 Delete selected (Del)')
         act_split.setEnabled(len(selected_rows) == 1)
         act_merge.setEnabled(len(selected_rows) >= 2)
+        act_delete.setEnabled(len(selected_rows) >= 1)
         action = menu.exec(self.tbl.viewport().mapToGlobal(pos))
         if action == act_split and selected_rows:
             self._split_row(selected_rows[0])
         elif action == act_merge and len(selected_rows) >= 2:
             self._merge_rows(selected_rows)
+        elif action == act_insert:
+            self._insert_row()
+        elif action == act_delete:
+            self._delete_rows()
 
     def _split_row(self, row: int):
         entry = self.entries[row]
@@ -2709,6 +2803,33 @@ class SRTTable(QWidget):
         if len(segs) < 2:
             return
         self.undo_stack.push(SplitCommand(self, row, segs))
+
+    def _insert_row(self):
+        """現在行の直後に空の行を1つ挿入する（直後の隙間を埋める時間で）。"""
+        row = self.tbl.currentRow()
+        n   = len(self.entries)
+        if n == 0:
+            at, start, end = 0, 0, 1000
+        else:
+            if row < 0:
+                row = n - 1
+            cur   = self.entries[row]
+            at    = row + 1
+            start = cur.end_ms
+            if at < n and self.entries[at].start_ms > start:
+                end = self.entries[at].start_ms     # 直後の隙間を埋める
+            else:
+                end = start + 1000
+        self.undo_stack.push(InsertRowCommand(self, at, SRTEntry(0, start, end, '', False)))
+        self.tbl.selectRow(at)
+
+    def _delete_rows(self):
+        rows = sorted({idx.row() for idx in self.tbl.selectedIndexes()})
+        if not rows and self.tbl.currentRow() >= 0:
+            rows = [self.tbl.currentRow()]
+        if not rows:
+            return
+        self.undo_stack.push(DeleteRowsCommand(self, rows))
 
     def _merge_rows(self, rows: List[int]):
         # 連続行チェック
