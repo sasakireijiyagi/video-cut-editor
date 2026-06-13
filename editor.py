@@ -2604,9 +2604,9 @@ class SRTTable(QWidget):
         vbox.addWidget(self.tbl)
 
         # 操作ヒント（薄く常時表示。デザインは変えず、気づける程度に）
-        hint = QLabel('S 分割   Z 前と統合   C 次と統合   I 挿入   Del 削除   X ✓   D 編集   ↑↓ 移動   （右クリックでも操作可）'
+        hint = QLabel('S 分割   Z 前と統合   C 次と統合   E 挿入   W 削除   X ✓   D 編集   ↑↓ 移動   （右クリックでも操作可）'
                       if _lang == 'ja' else
-                      'S split   Z merge w/prev   C merge w/next   I insert   Del delete   X check   D edit   ↑↓ move   (right-click too)')
+                      'S split   Z merge w/prev   C merge w/next   E insert   W delete   X check   D edit   ↑↓ move   (right-click too)')
         hint.setStyleSheet('color: #999; font-size: 11px; padding: 2px 2px 0 2px;')
         vbox.addWidget(hint)
 
@@ -2622,9 +2622,8 @@ class SRTTable(QWidget):
         QShortcut(QKeySequence('C'), self).activated.connect(self._merge_next)
         QShortcut(QKeySequence('S'), self).activated.connect(lambda: self._split_row(self.tbl.currentRow()))
         QShortcut(QKeySequence('D'), self).activated.connect(self._enter_edit_mode)
-        QShortcut(QKeySequence('I'), self).activated.connect(self._insert_row)
-        QShortcut(QKeySequence('Delete'), self).activated.connect(self._delete_rows)
-        QShortcut(QKeySequence('Backspace'), self).activated.connect(self._delete_rows)
+        QShortcut(QKeySequence('E'), self).activated.connect(self._insert_row)
+        QShortcut(QKeySequence('W'), self).activated.connect(self._delete_rows)
 
     def retranslate(self):
         self.btn_all.setText(tr('select_all'))
@@ -2779,8 +2778,8 @@ class SRTTable(QWidget):
         act_split  = menu.addAction('✂ 行を分割…' if _lang == 'ja' else '✂ Split row…')
         act_merge  = menu.addAction('⊕ 選択行を統合' if _lang == 'ja' else '⊕ Merge selected rows')
         menu.addSeparator()
-        act_insert = menu.addAction('＋ 行を挿入 (I)' if _lang == 'ja' else '＋ Insert row (I)')
-        act_delete = menu.addAction('🗑 選択行を削除 (Del)' if _lang == 'ja' else '🗑 Delete selected (Del)')
+        act_insert = menu.addAction('＋ 行を挿入 (E)' if _lang == 'ja' else '＋ Insert row (E)')
+        act_delete = menu.addAction('🗑 選択行を削除 (W)' if _lang == 'ja' else '🗑 Delete selected (W)')
         act_split.setEnabled(len(selected_rows) == 1)
         act_merge.setEnabled(len(selected_rows) >= 2)
         act_delete.setEnabled(len(selected_rows) >= 1)
