@@ -3,62 +3,372 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EasyTranscribe — 정비 중</title>
-  <meta name="description" content="EasyTranscribe 다운로드 페이지는 현재 정비 중입니다. 급하신 분은 GitHub에서 받으실 수 있습니다.">
+  <title>EasyTranscribe — 무료 로컬 동영상 받아쓰기 도구 | 동영상 열고 버튼 누르면 끝</title>
+  <meta name="description" content="동영상을 열고 버튼 하나만 누르면 끝. OpenAI Whisper로 100개 언어 지원. 완전 로컬 동작으로 개인정보 안심. Mac / Windows 인스톨러 포함. 무료.">
+  <meta name="keywords" content="받아쓰기,자동받아쓰기,Whisper,무료,로컬,동영상,자막,인터뷰,강의,회의,Mac,Windows,EasyTranscribe">
   <meta name="google-site-verification" content="X27hTtGK0DeluBd_bZirCDejo-S46s7V5m6wwHhLbis">
-  <meta name="robots" content="noindex">
   <link rel="canonical" href="https://sasakireijiyagi.github.io/video-cut-editor/ko.html">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sasakireijiyagi.github.io/video-cut-editor/ko.html">
+  <meta property="og:title" content="EasyTranscribe — 무료 로컬 동영상 받아쓰기 도구">
+  <meta property="og:description" content="동영상을 열고 버튼 하나만 누르면 끝. OpenAI Whisper로 100개 언어 지원. 완전 로컬 · 무료 · Mac / Windows.">
+  <meta property="og:image" content="https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EasyTranscribe — 무료 로컬 동영상 받아쓰기 도구">
+  <meta name="twitter:description" content="동영상을 열고 버튼 하나만 누르면 끝. OpenAI Whisper로 100개 언어 지원. 완전 로컬 · 무료 · Mac / Windows.">
+  <meta name="twitter:image" content="https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Zen Kaku Gothic New', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
       background: #f9f9f9;
       color: #1a1a1a;
-      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .lang-bar {
+      text-align: right;
+      padding: 0.6rem 1.5rem;
+      font-size: 0.8rem;
+    }
+    .lang-bar a { color: #999; text-decoration: none; }
+    .lang-bar a:hover { color: #e63946; }
+    .lang-bar .active { color: #e63946; font-weight: 600; }
+
+    .hero {
+      background: #f9f9f9;
+      text-align: center;
+      padding: 2rem 2rem 2rem;
+    }
+
+    .hero-title {
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2rem;
+      gap: 1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .hero-title img {
+      width: 56px;
+      height: 56px;
+    }
+
+    .hero-title h1 {
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #1a1a1a;
+    }
+
+    .hero-en {
+      font-size: 0.9rem;
+      color: #999;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+
+    .hero-tagline {
+      font-size: 1.1rem;
+      color: #444;
+      margin-bottom: 1.8rem;
       line-height: 1.8;
     }
-    .card { text-align: center; max-width: 480px; }
-    .icon { width: 72px; height: 72px; margin-bottom: 1.2rem; opacity: 0.95; }
-    h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.2rem; }
-    .en { font-size: 0.8rem; letter-spacing: 0.08em; color: #aaa; margin-bottom: 1.8rem; }
-    .msg { font-size: 1.05rem; color: #444; margin-bottom: 0.6rem; }
-    .sub { font-size: 0.9rem; color: #888; margin-bottom: 2.2rem; }
-    .gh {
-      display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.8rem 1.8rem; border: 1.5px solid #1a1a1a; border-radius: 8px;
-      color: #1a1a1a; text-decoration: none; font-size: 0.95rem; font-weight: 600;
+
+    .hero-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem 2rem;
+      width: 260px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    .btn-mac { background: #e63946; color: #fff; }
+    .btn-mac-intel { background: #c0392b; color: #fff; }
+    .btn-win { background: #1a1a1a; color: #fff; }
+    .btn-disabled { opacity: .45; pointer-events: none; cursor: default; }
+
+    .hero-note {
+      font-size: 0.8rem;
+      color: #999;
+    }
+    .hero-downloads {
+      margin-top: 0.8rem;
+      font-size: 0.8rem;
+      color: #999;
+      letter-spacing: 0.04em;
+    }
+    .hero-downloads span {
+      color: #e63946;
+      font-weight: 700;
+    }
+    .hero-readme {
+      margin-top: 0.6rem;
+      font-size: 0.9rem;
+    }
+    .hero-readme a {
+      color: #e63946;
+      text-decoration: none;
+      border-bottom: 1px solid #e6394640;
+      padding-bottom: 1px;
+    }
+    .hero-readme a:hover {
+      border-bottom-color: #e63946;
+    }
+
+    .hero-firstrun {
+      max-width: 540px;
+      margin: 1rem auto 0;
+      text-align: left;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 0.3rem 1.1rem;
+    }
+    .hero-firstrun summary {
+      cursor: pointer;
+      color: #888;
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 0.4rem 0;
+    }
+    .hero-firstrun summary:hover { color: #e63946; }
+    .hero-firstrun .frbody { padding: 0.4rem 0.2rem 0.7rem; color: #666; font-size: 0.8rem; line-height: 1.75; }
+    .hero-firstrun ol { margin: 0.6rem 0 0 1.2rem; }
+    .hero-firstrun li { margin-bottom: 0.3rem; }
+    .hero-firstrun a { color: #e63946; text-decoration: none; }
+    .hero-firstrun a:hover { text-decoration: underline; }
+    .hero-firstrun strong { color: #1a1a1a; }
+    .screenshot-section {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+    .screenshot-section img {
+      width: 100%;
+      border-radius: 14px;
+      box-shadow: 0 12px 48px rgba(44, 62, 80, 0.14);
+      border: 1px solid #e8e8e8;
+    }
+
+    .features-section {
+      max-width: 900px;
+      margin: 0 auto 3rem;
+      padding: 0 2rem;
+    }
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #999;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .feature {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 1.6rem;
+      transition: box-shadow 0.15s;
+    }
+    .feature:hover { box-shadow: 0 4px 20px rgba(44,62,80,0.08); }
+    .feature-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #e63946;
+      margin-bottom: 0.5rem;
+    }
+    .feature h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 0.4rem;
+    }
+    .feature p {
+      font-size: 0.82rem;
+      color: #666;
+      line-height: 1.65;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem 2rem;
+      font-size: 0.82rem;
+      color: #999;
+    }
+    footer a { color: #e63946; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .btn-donate {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 0.6rem 1.6rem;
+      border: 1.5px solid #e63946;
+      border-radius: 6px;
+      color: #e63946;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
       transition: background 0.15s, color 0.15s;
     }
-    .gh:hover { background: #1a1a1a; color: #fff; }
-    .hint { margin-top: 0.9rem; font-size: 0.8rem; color: #aaa; }
-    footer { margin-top: 2.4rem; font-size: 0.78rem; color: #bbb; }
-    footer a { color: #999; text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
+    .btn-donate:hover { background: #e63946; color: #fff; }
+    .footer-divider { margin: 0 0.5rem; opacity: 0.4; }
+    .citation-section { max-width: 900px; margin: 0 auto 3rem; padding: 0 2rem; }
+    .citation-box { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.6rem 2rem; }
+    .citation-box p { font-size: 0.82rem; color: #666; line-height: 1.8; font-family: 'Georgia', serif; }
+    .citation-box a { color: #e63946; text-decoration: none; }
+    .citation-box a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <img class="icon" src="AppIcon.png" alt="icon">
-    <h1>EasyTranscribe</h1>
-    <p class="en">おまかせ文字起こし</p>
 
-    <p class="msg">현재 정비 중입니다 🛠</p>
-    <p class="sub">조금만 기다려 주세요.</p>
-
-    <a class="gh" href="https://github.com/sasakireijiyagi/video-cut-editor" target="_blank" rel="noopener">
-      급하신 분은 GitHub에서 →
-    </a>
-    <p class="hint">다운로드·사용 방법은 GitHub 페이지에 있습니다</p>
-
-    <footer>
-      <a href="https://sasakireijiyagi.com/home" target="_blank" rel="noopener">Reiji Sasaki (Yagi Productions)</a>
-    </footer>
+  <div class="lang-bar">
+    <a href="index.html">日本語</a>
+    &nbsp;|&nbsp;
+    <a href="en.html">English</a>
+    &nbsp;|&nbsp;
+    <span class="active">한국어</span>
+    &nbsp;|&nbsp;
+    <a href="zh.html">中文</a>
   </div>
+
+  <section class="hero">
+    <div class="hero-title">
+      <img src="AppIcon.png" alt="icon">
+      <h1>EasyTranscribe</h1>
+    </div>
+    <p class="hero-en">おまかせ文字起こし</p>
+    <p class="hero-tagline">
+      동영상을 열고 버튼 하나만 누르면 끝.<br>
+      완전 로컬 · 무료 · 클라우드 불필요 · Mac / Windows 지원.
+    </p>
+    <div class="hero-buttons">
+      <a class="btn btn-mac" href="https://github.com/sasakireijiyagi/video-cut-editor/releases/latest/download/EasyTranscribe-Mac-AppleSilicon.dmg">
+        Mac
+      </a>
+      <span class="btn btn-win btn-disabled" aria-disabled="true" title="Windows 버전은 현재 조정 중입니다">
+        Windows (조정 중)
+      </span>
+    </div>
+    <p class="hero-downloads" id="download-count"></p>
+    <p class="hero-readme"><a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.ko.md" target="_blank">사용 방법 →</a></p>
+
+    <details class="hero-firstrun">
+      <summary>Mac에서 "열 수 없음"이라고 표시되면</summary>
+      <div class="frbody">
+        <p>이 앱은 Apple의 서명·공증을 거치지 않았기 때문에 처음 실행할 때 macOS가 경고를 표시합니다. <strong>악성코드가 감지된 것이 아니라</strong> 개발자 인증이 없다는 의미입니다. <a href="https://github.com/sasakireijiyagi/video-cut-editor" target="_blank">소스 코드는 GitHub에 전체 공개</a>되어 있으며 외부 통신도 전혀 하지 않습니다.</p>
+        <ol>
+        <li>경고 창에서 "완료"를 클릭 ("휴지통으로 이동"은 누르지 마세요)</li>
+        <li><strong>시스템 설정 → 개인정보 보호 및 보안</strong> 열기</li>
+        <li>아래쪽에 있는 "그래도 열기"를 클릭</li>
+        </ol>
+      </div>
+    </details>
+
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">개발 지원 기부</a>
+  </section>
+
+  <div class="screenshot-section">
+    <img src="screenshot.png" alt="EasyTranscribe 스크린샷">
+  </div>
+
+  <section class="features-section">
+    <p class="section-label">Features</p>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-label">Transcription</div>
+        <h3>고정밀 받아쓰기</h3>
+        <p>OpenAI Whisper 탑재. 100개 언어 지원 — 강의, 회의, 인터뷰에 최적.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Editing</div>
+        <h3>간편 편집 &amp; 컷</h3>
+        <p>SRT 세그먼트를 선택해 ffmpeg으로 컷 출력. 시작·종료 시간의 세밀한 조정도 가능.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Batch</div>
+        <h3>일괄 받아쓰기</h3>
+        <p>여러 파일을 대기열에 추가. 처리 중에도 파일 추가 가능. 남은 시간 표시.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Filler Cut</div>
+        <h3>필러 단어 제거</h3>
+        <p>8개 언어의 필러 단어를 자동 감지·제거. 단어 목록을 자유롭게 커스터마이즈.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Subtitle</div>
+        <h3>자막 합성</h3>
+        <p>굵은 흰 글씨에 검은 외곽선을 동영상에 직접 합성. 세로 동영상 자동 감지.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-label">Export</div>
+        <h3>EAF 내보내기</h3>
+        <p>언어 분석 도구 ELAN용 EAF 파일로 내보내기. 연구 용도에 최적.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="citation-section">
+    <p class="section-label">Citation</p>
+    <div class="citation-box">
+      <p>연구에서 이 도구를 사용하신 경우, 아래와 같이 인용해 주세요：</p>
+      <br>
+      <p>Sasaki, R. (2026). EasyTranscribe [Computer software]. <a href="https://doi.org/10.5281/zenodo.20515527" target="_blank">https://doi.org/10.5281/zenodo.20515527</a></p>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://github.com/sasakireijiyagi/video-cut-editor">GitHub</a>
+    <span class="footer-divider">|</span>
+    <a href="https://github.com/sasakireijiyagi/video-cut-editor/blob/main/README.ko.md">사용 방법</a>
+    <span class="footer-divider">|</span>
+    MIT License
+    <span class="footer-divider">|</span>
+    <a href="https://sasakireijiyagi.com/home" target="_blank">Reiji Sasaki (Yagi Productions)</a>
+    <br><br>
+    <a class="btn-donate" href="https://donate.sasakireijiyagi.com/" target="_blank">개발 지원 기부</a>
+    <br><br>
+    <span style="font-size:0.76rem; opacity:0.7;">Claude(Anthropic)의 도움을 받아 개발되었습니다</span>
+  </footer>
+
+<script>
+  fetch('downloads.json?v=' + Date.now())
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('download-count');
+      if (el && d.total > 0) el.innerHTML = 'Downloads <span>' + d.total.toLocaleString() + '</span>';
+    })
+    .catch(() => {});
+</script>
 </body>
 </html>
