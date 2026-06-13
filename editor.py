@@ -2369,15 +2369,23 @@ def _make_eaf(entries: List['SRTEntry'], video_path: str, tier_name: str) -> str
 
 
 class InsertRowCommand(QUndoCommand):
-    """指定位置に1行（空テキスト）を挿入する。"""
-    def __init__(self, srt_table, at_row: int, entry: 'SRTEntry'):
+    """指定位置に1行（空テキスト）を挿入する。
+    隙間が無い場合は shrink_row の終了を shrink_end まで詰めて場所を確保する。"""
+    def __init__(self, srt_table, at_row: int, entry: 'SRTEntry',
+                 shrink_row: int = None, shrink_end: int = None):
         super().__init__("行を挿入" if _lang == 'ja' else "Insert row")
-        self.srt_table = srt_table
-        self.at_row    = at_row
-        self.entry     = entry
+        self.srt_table  = srt_table
+        self.at_row     = at_row
+        self.entry      = entry
+        self.shrink_row = shrink_row
+        self.shrink_end = shrink_end
+        self._saved_end = None
 
     def redo(self):
         st = self.srt_table
+        if self.shrink_row is not None:
+            self._saved_end = st.entries[self.shrink_row].end_ms
+            st.entries[self.shrink_row].end_ms = self.shrink_end
         st.entries.insert(self.at_row, self.entry)
         _reindex(st.entries)
         st._repopulate()
@@ -2385,6 +2393,8 @@ class InsertRowCommand(QUndoCommand):
     def undo(self):
         st = self.srt_table
         del st.entries[self.at_row]
+        if self.shrink_row is not None:
+            st.entries[self.shrink_row].end_ms = self._saved_end
         _reindex(st.entries)
         st._repopulate()
 
@@ -2804,22 +2814,32 @@ class SRTTable(QWidget):
         self.undo_stack.push(SplitCommand(self, row, segs))
 
     def _insert_row(self):
-        """現在行の直後に空の行を1つ挿入する（直後の隙間を埋める時間で）。"""
+        """現在行の直後に空の行を1つ挿入する。
+        直後に隙間があればそれを埋める。隙間が無ければ現在行の終わりから
+        最大0.5秒を分けてもらって場所を確保する（後続の時間はずらさない）。"""
         row = self.tbl.currentRow()
         n   = len(self.entries)
         if n == 0:
-            at, start, end = 0, 0, 1000
-        else:
-            if row < 0:
-                row = n - 1
-            cur   = self.entries[row]
-            at    = row + 1
-            start = cur.end_ms
-            if at < n and self.entries[at].start_ms > start:
-                end = self.entries[at].start_ms     # 直後の隙間を埋める
-            else:
-                end = start + 1000
-        self.undo_stack.push(InsertRowCommand(self, at, SRTEntry(0, start, end, '', False)))
+            self.undo_stack.push(InsertRowCommand(self, 0, SRTEntry(0, 0, 1000, '', False)))
+            self.tbl.selectRow(0)
+            return
+        if row < 0:
+            row = n - 1
+        cur = self.entries[row]
+        at  = row + 1
+        shrink_row = shrink_end = None
+        if at < n:
+            nxt = self.entries[at]
+            if nxt.start_ms > cur.end_ms:               # 隙間あり → 埋める
+                start, end = cur.end_ms, nxt.start_ms
+            else:                                       # 隙間なし → 現在行から一部を分けてもらう
+                slice_ms = min(500, max(1, (cur.end_ms - cur.start_ms) // 2))
+                start, end = cur.end_ms - slice_ms, cur.end_ms
+                shrink_row, shrink_end = row, start
+        else:                                           # 最終行の後 → 余地あり
+            start, end = cur.end_ms, cur.end_ms + 1000
+        self.undo_stack.push(
+            InsertRowCommand(self, at, SRTEntry(0, start, end, '', False), shrink_row, shrink_end))
         self.tbl.selectRow(at)
 
     def _delete_rows(self):
