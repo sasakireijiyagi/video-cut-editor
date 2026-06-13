@@ -2534,6 +2534,13 @@ class SRTTable(QWidget):
         self.tbl.customContextMenuRequested.connect(self._on_context_menu)
         vbox.addWidget(self.tbl)
 
+        # 操作ヒント（薄く常時表示。デザインは変えず、気づける程度に）
+        hint = QLabel('S 分割   Z 前と統合   C 次と統合   X ✓   D 編集   ↑↓ 移動   （右クリックでも操作可）'
+                      if _lang == 'ja' else
+                      'S split   Z merge w/prev   C merge w/next   X check   D edit   ↑↓ move   (right-click too)')
+        hint.setStyleSheet('color: #999; font-size: 11px; padding: 2px 2px 0 2px;')
+        vbox.addWidget(hint)
+
         # Undo / Redo ショートカット
         QShortcut(QKeySequence('Ctrl+Z'), self).activated.connect(self.undo_stack.undo)
         QShortcut(QKeySequence('Ctrl+Y'), self).activated.connect(self.undo_stack.redo)
