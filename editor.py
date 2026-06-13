@@ -2756,9 +2756,12 @@ class SRTTable(QWidget):
 # ──────────────────────────────────────────────────────────────────
 
 class VideoPlayer(QWidget):
+    userSeeked = pyqtSignal(int)   # ユーザーがスライダーで位置を変えた（ドラッグ/クリック両方）
+
     def __init__(self):
         super().__init__()
         self._seg_end: Optional[int] = None
+        self._slider_programmatic = False   # 再生に伴うスライダー自動更新中フラグ
         self._build()
         self._setup_player()
 
@@ -2791,7 +2794,9 @@ class VideoPlayer(QWidget):
         self.lbl_time = QLabel("--:--:-- / --:--:--")
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 0)
-        self.slider.sliderMoved.connect(self._seek)
+        # valueChangedに繋ぐ＝ドラッグもクリックジャンプも拾える。
+        # 再生中の自動更新は _slider_programmatic フラグで除外する。
+        self.slider.valueChanged.connect(self._on_slider_value)
         cbar.addWidget(self.btn_play)
         cbar.addWidget(self.btn_pause)
         cbar.addWidget(self.btn_stop)
@@ -2838,8 +2843,17 @@ class VideoPlayer(QWidget):
     def _seek(self, pos: int):
         self.player.setPosition(pos)
 
+    def _on_slider_value(self, v: int):
+        # 再生に伴う自動更新は無視。ユーザー操作（ドラッグ/クリック）のみ反応。
+        if self._slider_programmatic:
+            return
+        self._seek(v)
+        self.userSeeked.emit(v)
+
     def _on_pos(self, pos: int):
+        self._slider_programmatic = True
         self.slider.setValue(pos)
+        self._slider_programmatic = False
         dur = self.player.duration()
         self.lbl_time.setText(f"{_ms_to_clock(pos)} / {_ms_to_clock(dur)}")
         if self._seg_end is not None and pos >= self._seg_end:
@@ -3004,10 +3018,10 @@ class MainWindow(QMainWindow):
 
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
-        # スライダーをドラッグで動かしたときだけSRT表を追従（sliderMovedはユーザー操作時のみ発火）。
-        # positionChangedに繋がないことで、区間再生の終了時に選択が次行へ勝手に動くのを防ぐ。
+        # ユーザーがスライダーで位置を変えた（ドラッグ/クリック両方）ときだけSRT表を追従。
+        # 再生中の自動更新では発火しないので、区間再生の終了時に選択が次行へ勝手に動かない。
         self._follow_row = -1
-        self.player.slider.sliderMoved.connect(self._follow_srt_to_position)
+        self.player.userSeeked.connect(self._follow_srt_to_position)
         self.spl.addWidget(self.srt_tbl)
 
         # 再生コントロールを右側（全選択行とステップ行の間）に配置
