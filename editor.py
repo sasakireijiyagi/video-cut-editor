@@ -91,6 +91,10 @@ STRINGS = {
         'mark_silence_tip'  : '発話間の無音区間をSRTに[間 X.X秒]として挿入する',
         'silence_suffix'    : ' 秒以上',
         'silence_tip'       : 'この秒数以上の無音を[間]として記録する',
+        'fill_gaps'         : '敷き詰め',
+        'fill_gaps_tip'     : '発話間のすべての隙間にエントリを挿入する（会話分析向け）',
+        'fill_mode_label'   : '[間]表示',
+        'fill_mode_blank'   : '空欄',
         'output_group'      : '出力設定',
         'combine'           : '1ファイルに結合',
         'separate'          : '行ごとに別ファイル',
@@ -149,6 +153,10 @@ STRINGS = {
         'mark_silence_tip'  : 'Insert [Pause X.Xs] entries for silent gaps in SRT',
         'silence_suffix'    : ' sec or more',
         'silence_tip'       : 'Record silence longer than this as [Pause]',
+        'fill_gaps'         : 'Fill All Gaps',
+        'fill_gaps_tip'     : 'Insert an entry for every gap between utterances (for conversation analysis)',
+        'fill_mode_label'   : '[Pause] label',
+        'fill_mode_blank'   : 'Blank',
         'output_group'      : 'Output Settings',
         'combine'           : 'Combine into one file',
         'separate'          : 'Separate file per segment',
@@ -1225,13 +1233,16 @@ class WhisperWorker(QThread):
     done = pyqtSignal(bool, str)
 
     def __init__(self, video: str, model: str, language: str,
-                 mark_silence: bool = False, silence_sec: float = 1.0):
+                 mark_silence: bool = False, silence_sec: float = 1.0,
+                 fill_gaps: bool = False, fill_mode: str = 'label'):
         super().__init__()
         self.video        = video
         self.model        = model
         self.language     = language
         self.mark_silence = mark_silence
         self.silence_ms   = int(silence_sec * 1000)
+        self.fill_gaps    = fill_gaps
+        self.fill_mode    = fill_mode
         self._proc        = None
 
     def cancel(self):
@@ -1326,6 +1337,37 @@ class WhisperWorker(QThread):
             inserted = len(new_entries) - len(entries)
             self.log.emit(f"  {'[Pause] inserted' if _lang=='en' else '[間] を挿入'}: {inserted} ({self.silence_ms/1000:.1f}{'s' if _lang=='en' else '秒'}+)")
 
+        elif self.fill_gaps:
+            entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
+            new_entries = []
+            for i, entry in enumerate(entries):
+                new_entries.append(entry)
+                if i + 1 < len(entries):
+                    gap_ms = entries[i + 1].start_ms - entry.end_ms
+                    if gap_ms > 0:
+                        if self.fill_mode == 'blank':
+                            label = ''
+                        else:
+                            label = f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
+                        new_entries.append(SRTEntry(
+                            index=0,
+                            start_ms=entry.end_ms,
+                            end_ms=entries[i + 1].start_ms,
+                            text=label,
+                        ))
+            for idx, e in enumerate(new_entries):
+                e.index = idx + 1
+            lines = []
+            for e in new_entries:
+                lines.append(str(e.index))
+                lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                lines.append(e.text)
+                lines.append('')
+            srt.write_text('\n'.join(lines), encoding='utf-8')
+            inserted = len(new_entries) - len(entries)
+            mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
+            self.log.emit(f"  {'Gaps filled' if _lang=='en' else '敷き詰め完了'} ({mode_str}): +{inserted}")
+
         self.done.emit(True, str(srt))
 
 
@@ -1346,13 +1388,16 @@ class BatchWhisperWorker(QThread):
     seg_progress  = pyqtSignal(float)           # 処理済みの最新タイムスタンプ（秒）
 
     def __init__(self, files: List[str], model: str, language: str,
-                 mark_silence: bool, silence_sec: float):
+                 mark_silence: bool, silence_sec: float,
+                 fill_gaps: bool = False, fill_mode: str = 'label'):
         super().__init__()
         self.files        = files
         self.model        = model
         self.language     = language
         self.mark_silence = mark_silence
         self.silence_ms   = int(silence_sec * 1000)
+        self.fill_gaps    = fill_gaps
+        self.fill_mode    = fill_mode
         self._stop        = False
         self._proc        = None
 
@@ -1472,6 +1517,31 @@ class BatchWhisperWorker(QThread):
                     lines.append('')
                 srt.write_text('\n'.join(lines), encoding='utf-8')
 
+            elif self.fill_gaps:
+                entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
+                new_entries = []
+                for j, entry in enumerate(entries):
+                    new_entries.append(entry)
+                    if j + 1 < len(entries):
+                        gap_ms = entries[j + 1].start_ms - entry.end_ms
+                        if gap_ms > 0:
+                            if self.fill_mode == 'blank':
+                                label = ''
+                            else:
+                                label = (f'[Pause  {gap_ms/1000:.1f}s]'
+                                         if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]')
+                            new_entries.append(SRTEntry(0, entry.end_ms,
+                                entries[j + 1].start_ms, label))
+                for idx, e in enumerate(new_entries):
+                    e.index = idx + 1
+                lines = []
+                for e in new_entries:
+                    lines.append(str(e.index))
+                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                    lines.append(e.text)
+                    lines.append('')
+                srt.write_text('\n'.join(lines), encoding='utf-8')
+
             success += 1
             self.file_done.emit(i + 1, total, True, str(srt))
             i += 1
@@ -1486,7 +1556,8 @@ class BatchWhisperWorker(QThread):
 class BatchDialog(QDialog):
     def __init__(self, parent=None, model: str = 'large-v3',
                  language: str = '日本語',
-                 mark_silence: bool = False, silence_sec: float = 1.0):
+                 mark_silence: bool = False, silence_sec: float = 1.0,
+                 fill_gaps: bool = False, fill_mode: str = 'label'):
         super().__init__(parent)
         self.setWindowTitle('バッチ文字起こし' if _lang == 'ja' else 'Batch Transcription')
         self.setMinimumSize(700, 500)
@@ -1495,6 +1566,8 @@ class BatchDialog(QDialog):
         self._default_language = language
         self._default_silence  = mark_silence
         self._default_silence_sec = silence_sec
+        self._default_fill_gaps = fill_gaps
+        self._default_fill_mode = fill_mode
         self._build()
 
     def _build(self):
@@ -1556,6 +1629,19 @@ class BatchDialog(QDialog):
         self.spn_silence.setSuffix(' 秒以上' if _lang == 'ja' else ' sec+')
         cfg.addWidget(self.chk_silence)
         cfg.addWidget(self.spn_silence)
+        cfg.addSpacing(12)
+        self.chk_fill_gaps = QCheckBox('敷き詰め' if _lang == 'ja' else 'Fill All Gaps')
+        self.chk_fill_gaps.setToolTip('発話間のすべての隙間にエントリを挿入する' if _lang == 'ja'
+                                      else 'Insert an entry for every gap between utterances')
+        self.chk_fill_gaps.setChecked(self._default_fill_gaps)
+        self.cmb_fill_mode = QComboBox()
+        self.cmb_fill_mode.addItems(['[間]表示' if _lang == 'ja' else '[Pause] label',
+                                     '空欄' if _lang == 'ja' else 'Blank'])
+        self.cmb_fill_mode.setCurrentIndex(0 if self._default_fill_mode == 'label' else 1)
+        self.cmb_fill_mode.setEnabled(self._default_fill_gaps)
+        self.chk_fill_gaps.toggled.connect(self.cmb_fill_mode.setEnabled)
+        cfg.addWidget(self.chk_fill_gaps)
+        cfg.addWidget(self.cmb_fill_mode)
         cfg.addStretch()
         vbox.addLayout(cfg)
 
@@ -1658,10 +1744,13 @@ class BatchDialog(QDialog):
         model = self.cmb_model.currentText().lstrip('★ ')
         lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
 
+        fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
         self._worker = BatchWhisperWorker(
             files, model, lang,
             self.chk_silence.isChecked(),
-            self.spn_silence.value())
+            self.spn_silence.value(),
+            fill_gaps=self.chk_fill_gaps.isChecked(),
+            fill_mode=fill_mode)
         self._worker.file_started.connect(self._on_file_started)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.seg_tick.connect(self._on_seg_tick)
@@ -3125,6 +3214,13 @@ class MainWindow(QMainWindow):
         self.spn_silence.setSuffix(tr('silence_suffix'))
         self.spn_silence.setToolTip(tr('silence_tip'))
 
+        self.chk_fill_gaps = QCheckBox(tr('fill_gaps'))
+        self.chk_fill_gaps.setToolTip(tr('fill_gaps_tip'))
+        self.cmb_fill_mode = QComboBox()
+        self.cmb_fill_mode.addItems([tr('fill_mode_label'), tr('fill_mode_blank')])
+        self.cmb_fill_mode.setEnabled(False)
+        self.chk_fill_gaps.toggled.connect(self.cmb_fill_mode.setEnabled)
+
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
         w_bar.addWidget(self.lbl_model)
@@ -3138,6 +3234,9 @@ class MainWindow(QMainWindow):
         w_bar.addSpacing(16)
         w_bar.addWidget(self.chk_mark_silence)
         w_bar.addWidget(self.spn_silence)
+        w_bar.addSpacing(8)
+        w_bar.addWidget(self.chk_fill_gaps)
+        w_bar.addWidget(self.cmb_fill_mode)
         w_bar.addStretch()
         vbox.addLayout(w_bar)
 
@@ -3284,6 +3383,8 @@ class MainWindow(QMainWindow):
             language=self.cmb_lang.currentText(),
             mark_silence=self.chk_mark_silence.isChecked(),
             silence_sec=self.spn_silence.value(),
+            fill_gaps=self.chk_fill_gaps.isChecked(),
+            fill_mode='label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank',
         )
         dlg.exec()
 
@@ -3336,6 +3437,12 @@ class MainWindow(QMainWindow):
         self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
         self.spn_silence.setSuffix(tr('silence_suffix'))
         self.spn_silence.setToolTip(tr('silence_tip'))
+        self.chk_fill_gaps.setText(tr('fill_gaps'))
+        self.chk_fill_gaps.setToolTip(tr('fill_gaps_tip'))
+        cur_idx = self.cmb_fill_mode.currentIndex()
+        self.cmb_fill_mode.clear()
+        self.cmb_fill_mode.addItems([tr('fill_mode_label'), tr('fill_mode_blank')])
+        self.cmb_fill_mode.setCurrentIndex(cur_idx)
         self.grp_output.setTitle(tr('output_group'))
         self.rb_combine.setText(tr('combine'))
         self.rb_separate.setText(tr('separate'))
@@ -3756,10 +3863,13 @@ class MainWindow(QMainWindow):
         model = self.cmb_model.currentText().lstrip('★ ')
         lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
 
+        fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
         self.whisper_worker = WhisperWorker(
             self.video_path, model, lang,
             mark_silence=self.chk_mark_silence.isChecked(),
             silence_sec=self.spn_silence.value(),
+            fill_gaps=self.chk_fill_gaps.isChecked(),
+            fill_mode=fill_mode,
         )
         self.whisper_worker.log.connect(self.log.append)
         self.whisper_worker.done.connect(self._on_transcription_done)
