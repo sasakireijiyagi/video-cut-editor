@@ -360,6 +360,20 @@ _MLX_MODELS = {
     'tiny':           'mlx-community/whisper-tiny-mlx',
 }
 
+def _pip_python() -> str:
+    """`pip install` を実行する Python を返す。ソース実行なら sys.executable。
+    凍結アプリ(PyInstaller)では sys.executable はアプリ本体でpipが無いため、
+    既存whisper/mlxと同じ環境のpython（アプリが探す場所と一致）→ python3 の順で探す。"""
+    if not getattr(sys, 'frozen', False):
+        return sys.executable
+    for binpath in (MLX_WHISPER_BIN, WHISPER_BIN):
+        if binpath and os.sep in binpath:
+            cand = os.path.join(os.path.dirname(binpath),
+                                'python.exe' if sys.platform == 'win32' else 'python')
+            if os.path.exists(cand):
+                return cand
+    return shutil.which('python3') or shutil.which('python') or sys.executable
+
 def _active_engine(model: str):
     """このモデルで使うエンジンを決める。戻り値: ('mlx', bin) か ('openai', bin)。
     Apple Silicon かつ mlx_whisper があり、モデルに mlx 版がある場合のみ mlx。"""
@@ -495,7 +509,7 @@ def _is_whisper_ok() -> bool:
 class SetupDialog(QDialog):
     """ffmpeg / Whisper が見つからないときに自動インストールを提案するダイアログ"""
 
-    def __init__(self, missing_ffmpeg: bool, missing_whisper: bool, parent=None):
+    def __init__(self, missing_ffmpeg: bool, missing_whisper: bool, parent=None, upgrade: bool = False):
         super().__init__(parent)
         self.setWindowTitle('セットアップ' if _lang == 'ja' else 'Setup')
         self.setMinimumWidth(480)
@@ -504,7 +518,18 @@ class SetupDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        if _lang == 'ja':
+        if upgrade:
+            # 既存ユーザー(旧openai-whisper)へ、GPU対応の新エンジン導入を案内
+            if _lang == 'ja':
+                msg = ('🚀 v1.1.0 から音声認識エンジンが新しくなりました（GPU対応の mlx-whisper）。\n'
+                       '今は旧エンジンで動いています。Whisper を入れ直すと、Mac の GPU で\n'
+                       '文字起こしが大幅に高速化します（large-v3 が実用速度に）。\n'
+                       '今すぐ入れ直しますか？（インターネット接続が必要です）')
+            else:
+                msg = ('🚀 Since v1.1.0 the speech engine is new (GPU-accelerated mlx-whisper).\n'
+                       'You are still on the old engine. Reinstalling Whisper makes transcription\n'
+                       'much faster on your Mac GPU. Reinstall now? (Internet required)')
+        elif _lang == 'ja':
             msg = '以下のソフトウェアが見つかりませんでした。\n自動でインストールしますか？\n（インターネット接続が必要です）'
         else:
             msg = 'The following software was not found.\nInstall automatically?\n(Internet connection required)'
@@ -622,9 +647,11 @@ class SetupWorker(QThread):
             if self.do_whisper:
                 # Apple Silicon は Metal GPU 対応の mlx-whisper、それ以外は openai-whisper
                 pkg = 'mlx-whisper' if _IS_APPLE_SILICON else 'openai-whisper'
+                py  = _pip_python()
                 self.log_line.emit(f'Whisper（{pkg}）をインストール中...')
+                self.log_line.emit(f'  （うまくいかない場合は手動で: pip install {pkg}）')
                 proc = subprocess.Popen(
-                    [sys.executable, '-m', 'pip', 'install', pkg],
+                    [py, '-m', 'pip', 'install', pkg],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
                     self.log_line.emit(line.rstrip())
@@ -3823,6 +3850,13 @@ def main():
         if missing_ffmpeg or missing_whisper:
             dlg = SetupDialog(missing_ffmpeg, missing_whisper)
             dlg.exec()
+        elif _IS_APPLE_SILICON and not MLX_WHISPER_BIN:
+            # 旧版からの更新ユーザー（openai-whisperはあるがGPU版mlx無し）へ一度だけ案内
+            from PyQt6.QtCore import QSettings
+            st = QSettings('EasyTranscribe', 'EasyTranscribe')
+            if not st.value('mlx_upgrade_offered', False, type=bool):
+                SetupDialog(False, True, upgrade=True).exec()
+                st.setValue('mlx_upgrade_offered', True)
         _show_main()
 
     splash.finished.connect(_after_splash)
