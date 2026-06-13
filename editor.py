@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.6"
+APP_VERSION = "1.1.7"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -3241,15 +3241,28 @@ class MainWindow(QMainWindow):
 
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
+
+        # ボタン・コンボのサイズ調整
+        self.cmb_model.setMaximumWidth(130)
+        self.cmb_lang.setMaximumWidth(90)
+        self.btn_transcribe.setMaximumWidth(130)
+        self.btn_transcribe_cancel.setMaximumWidth(50)
+        self.btn_batch.setMaximumWidth(150)
+        self.spn_silence.setFixedWidth(78)
+        self.cmb_fill_mode.setFixedWidth(72)
+
+        w_bar.setSpacing(4)
         w_bar.addWidget(self.lbl_model)
         w_bar.addWidget(self.cmb_model)
+        w_bar.addSpacing(4)
         w_bar.addWidget(self.lbl_lang)
         w_bar.addWidget(self.cmb_lang)
+        w_bar.addSpacing(4)
         w_bar.addWidget(self.btn_transcribe)
         w_bar.addWidget(self.btn_transcribe_cancel)
         w_bar.addSpacing(8)
         w_bar.addWidget(self.btn_batch)
-        w_bar.addSpacing(16)
+        w_bar.addSpacing(12)
         w_bar.addWidget(self.chk_mark_silence)
         w_bar.addWidget(self.spn_silence)
         w_bar.addSpacing(8)
