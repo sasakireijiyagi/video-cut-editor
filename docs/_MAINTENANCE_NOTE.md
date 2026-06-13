@@ -1,59 +1,48 @@
-# ⚠️ ランディングページは現在「整備中ページ」に差し替え中
+# ℹ️ ランディングページの状態メモ（最新: 2026-06-13）
 
-2026-06-13、ダウンロードサイトを一時的にお休みにして「整備中です、ちょっと待ってて」という
-シンプルなページに差し替えました。落ち着いたら（v1.0.10の検証・公開が済んだら）元に戻します。
+**サイトは通常のダウンロードページに復帰済み**です。v1.0.10・v1.1.0 の検証・公開が済んだため、
+「整備中」ページから元のダウンロードページに戻しました。
+ただし **Windowsのダウンロードだけ「調整中」表示**にして一時的に伏せています。
 
 ## 今の状態
 
-| ファイル | 今の中身 | 元のフルページのバックアップ |
-|----------|----------|------------------------------|
-| `docs/index.html` | 🛠 整備中（日本語） | `docs/index.full.html` |
-| `docs/en.html`    | 🛠 Under maintenance | `docs/en.full.html` |
-| `docs/ko.html`    | 🛠 정비 중 | `docs/ko.full.html` |
-| `docs/zh.html`    | 🛠 维护中 | `docs/zh.full.html` |
+| ファイル | 今の中身 | 復帰用マスター |
+|----------|----------|----------------|
+| `docs/index.html`（日本語） | 通常DLページ・Mac公開／**Windows（調整中）** | `docs/index.full.html` |
+| `docs/en.html` | 同上（Windows under adjustment） | `docs/en.full.html` |
+| `docs/ko.html` | 同上（Windows 조정 중） | `docs/ko.full.html` |
+| `docs/zh.html` | 同上（Windows 调整中） | `docs/zh.full.html` |
 
-- 整備中ページには「お急ぎの方は GitHub から →」リンク（リポジトリのトップへ）を掲載
-- `<meta name="robots" content="noindex">` を入れて、整備中ページが検索結果に出ないようにしている
-- Google Search Console認証タグ（google-site-verification）は維持しているので、認証は外れない
+- **Mac**: Apple Silicon DMG を通常どおりダウンロード可。
+- **Windows**: ダウンロードボタンを無効化し「調整中」ラベル（CSSクラス `btn-disabled`）に置換。`.zip` リンクは外している。
+- noindex は外れた（通常ページに戻ったので検索インデックス対象）。Search Console認証タグは維持。
+- `*.full.html` は **Windows有効のままの元ページ** ＝ 将来Windowsを再開するときのマスター（無変更で温存）。
 
-## 元のフルページ（`*.full.html`）の中身＝復帰したらこうなる
+## なぜ Windows だけ「調整中」か
 
-元のランディングページは、こういう構成だった（復帰するとこれが戻る）：
+v1.1.0 で **Mac版だけ mlx-whisper（Metal GPU）に載せ替えて高速化**した（large-v3 が約11倍速）。
+Windows版は従来どおり openai-whisper（CPU）で遅く、かつ Windows実機での動作確認ができていないため、
+当面ダウンロードを伏せている。Windowsの faster-whisper 化（whisper-ctranslate2、CPUでも数倍速）は
+**Phase 2** として保留中。
 
-- **ヒーロー**: アプリアイコン＋「おまかせ文字起こし / EasyTranscribe」＋キャッチコピー
-- **ダウンロードボタン2つ**: 「Mac」(Apple Silicon DMG) と「Windows」(zip)
-  - URLは `releases/latest/download/EasyTranscribe-Mac-AppleSilicon.dmg` と `...-Windows.zip`
-  - ※Intel版は廃止済み（ボタンも無し）
-- **ダウンロード数表示**: `downloads.json` を fetch して「Downloads NN」と表示（毎朝JST9時に自動更新）
-- **使い方リンク**: README へ
-- **折りたたみ注記**: 「Macで『開いていません』と表示されたら」→ 未署名アプリのGatekeeper対処（システム設定→プライバシーとセキュリティ→このまま開く）
-- **寄付ボタン**: donate.sasakireijiyagi.com へ
-- **スクリーンショット**（screenshot.png）
-- **機能一覧**（Features グリッド6項目）
-- **引用（Citation）**: Sasaki, R. (2026). EasyTranscribe [Computer software]. DOI: 10.5281/zenodo.20515527
-- **フッター**: GitHub / README / MIT License / 佐々木玲仁（ヤギ製作所）リンク
-  ＋「Claude（Anthropic）の支援を受けて開発」の透明性表記
-- **言語切替バー**: 日本語 | English | 한국어 | 中文（4言語相互リンク）
-- SEOメタタグ・OGP・Twitterカード・canonical 一式
+## Windows を再開するとき（Phase 2 完了後）
 
-実物を見たい場合は `docs/index.full.html` をブラウザで開けば、そのまま元のページが見られる。
-
-## 復帰のしかた（4言語まとめて一発）
-
-落ち着いたら、これで全ページを通常版に戻せる：
+全ページを Windows有効のマスターに戻す（＝Macも含め元のフルページに戻る）：
 
 ```bash
 cd ~/tools/video_editor
 for f in index en ko zh; do cp docs/$f.full.html docs/$f.html; done
-git commit -am "ランディングページを通常版に復帰（4言語）"
+git commit -am "ランディング: Windowsダウンロードを再開（4言語）"
 git push
 ```
 
-GitHub Pages反映に1〜2分。反映後はブラウザを Cmd+Shift+R で強制リロードして確認。
-（戻したあと `*.full.html` のバックアップは消してもいいし、残しておいてもいい）
+Windowsボタンだけ手早く戻したい場合は、各 `*.html` の
+`<span class="btn btn-win btn-disabled" ...>Windows（調整中）</span>` を
+元の `<a class="btn btn-win" href="...releases/latest/download/EasyTranscribe-Windows.zip">Windows</a>` に戻すだけでもよい。
 
-## なぜ休止したか
+## 経緯
 
-いろいろなプロジェクトが同時進行していて、まずバッチ進捗改善（コミット 8bda342）の検証と
-v1.0.10リリースを落ち着いてやりたいため。サイトの集客より先に中身を固める判断。
-急ぎのユーザーはGitHubから直接ダウンロードできるので実害はない。
+2026-06-13、複数プロジェクト同時進行のため一旦ダウンロードサイトを「整備中」ページに差し替え →
+同日中に Mac mini 側で **v1.0.10**（バッチ進捗の見える化＋Dropboxダウンロード表示）と
+**v1.1.0**（Mac版を mlx-whisper / Metal GPU 化）を検証・リリース →
+復帰条件が満たされたのでサイトを通常版に復帰（Windowsのみ調整中）。
