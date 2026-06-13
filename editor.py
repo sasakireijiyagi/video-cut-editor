@@ -2847,6 +2847,29 @@ class VideoPlayer(QWidget):
 # Main window
 # ──────────────────────────────────────────────────────────────────
 
+class _MaterializeWorker(QThread):
+    """Dropbox等の未ダウンロード動画を実体化（ローカルにDL）するワーカー。進捗を通知。"""
+    progress = pyqtSignal(int)    # 0-100
+    done     = pyqtSignal(bool)   # True=完了 / False=中断・失敗
+
+    def __init__(self, path: str):
+        super().__init__()
+        self.path  = path
+        self._stop = False
+
+    def cancel(self):
+        self._stop = True
+
+    def run(self):
+        try:
+            _materialize(self.path,
+                         progress_cb=lambda p: self.progress.emit(p),
+                         should_stop=lambda: self._stop)
+            self.done.emit(not self._stop)
+        except Exception:
+            self.done.emit(False)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -2879,6 +2902,11 @@ class MainWindow(QMainWindow):
         self.btn_export_eaf.setEnabled(False)
         self.btn_export_eaf.setToolTip('ELAN用EAFファイルを書き出す' if _lang == 'ja' else 'Export as ELAN EAF file')
         self.btn_export_eaf.clicked.connect(self._export_eaf)
+        self.btn_export_srt = QPushButton('SRT書き出し' if _lang == 'ja' else 'Export SRT')
+        self.btn_export_srt.setEnabled(False)
+        self.btn_export_srt.setToolTip('編集中のSRTを別ファイルに書き出す（元ファイルは上書きしない）'
+                                       if _lang == 'ja' else 'Export the current SRT to a new file (does not overwrite)')
+        self.btn_export_srt.clicked.connect(self._export_srt)
         self.btn_close_video = QPushButton('✕')
         self.btn_close_video.setFixedWidth(28)
         self.btn_close_video.setEnabled(False)
@@ -2900,7 +2928,7 @@ class MainWindow(QMainWindow):
         self.btn_donate.setToolTip(tr('donate_tip'))
         self.btn_donate.clicked.connect(self._open_donate)
 
-        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt, self.btn_export_eaf):
+        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt, self.btn_export_srt, self.btn_export_eaf):
             bar.addWidget(w)
         bar.addStretch()
         bar.addWidget(self.btn_lang)
@@ -3200,12 +3228,49 @@ class MainWindow(QMainWindow):
             tr('dlg_video_filter'))
         if not path:
             return
+        # Dropbox等のオンラインのみファイルは、進捗を見せながら実体化してから読み込む
+        if _is_dataless(path):
+            self._materialize_then_open(path)
+        else:
+            self._finish_open_video(path)
+
+    def _materialize_then_open(self, path: str):
+        from PyQt6.QtWidgets import QProgressDialog
+        dlg = QProgressDialog(
+            '📥 Dropboxからダウンロード中…' if _lang == 'ja' else '📥 Downloading from Dropbox…',
+            'キャンセル' if _lang == 'ja' else 'Cancel', 0, 100, self)
+        dlg.setWindowTitle('動画を読み込み中' if _lang == 'ja' else 'Loading video')
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setAutoClose(False)
+        dlg.setAutoReset(False)
+        worker = _MaterializeWorker(path)
+        self._mat_worker = worker          # 参照を保持（GCで止まらないように）
+        worker.progress.connect(dlg.setValue)
+
+        def _on_done(ok: bool):
+            dlg.close()
+            if ok:
+                self._finish_open_video(path)
+            elif _lang == 'ja':
+                self.log.append('動画の読み込みを中止しました')
+            else:
+                self.log.append('Video loading cancelled.')
+        worker.done.connect(_on_done)
+        dlg.canceled.connect(worker.cancel)
+        worker.start()
+        dlg.exec()
+
+    def _finish_open_video(self, path: str):
         self.video_path = path
         self.srt_path   = None
         self.lbl_video.setText(tr('video_label').format(name=Path(path).name))
         self.lbl_srt.setText(tr('srt_none'))
         self.srt_tbl.load([])
         self.btn_save_srt.setEnabled(False)
+        self.btn_export_srt.setEnabled(False)
+        # 出力先フォルダも動画と同じ場所に（毎回 Downloads に戻さない）
+        self.txt_dir.setText(str(Path(path).parent))
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
         self.btn_close_video.setEnabled(True)
@@ -3250,6 +3315,7 @@ class MainWindow(QMainWindow):
         self.srt_path = path
         self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
         self.btn_save_srt.setEnabled(True)
+        self.btn_export_srt.setEnabled(True)
         self.log.append(tr('log_srt_loaded').format(n=len(entries), path=path))
 
     def _save_srt(self):
@@ -3276,6 +3342,37 @@ class MainWindow(QMainWindow):
 
         self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
         self.log.append(tr('log_srt_saved').format(path=path))
+
+    def _export_srt(self):
+        """編集中のSRTを別ファイルに書き出す（保存＝上書きとは別。srt_pathは変えない）。"""
+        entries = self.srt_tbl.entries
+        if not entries:
+            QMessageBox.warning(self, tr('err_title'),
+                'SRTが読み込まれていません' if _lang == 'ja' else 'No SRT loaded.')
+            return
+        # デフォルト: 動画と同じ場所・「元の名前_edited.srt」（元ファイルの上書き事故を防ぐ）
+        base = self.video_path or self.srt_path
+        if base:
+            default = str(Path(base).with_name(Path(base).stem + '_edited.srt'))
+        else:
+            default = str(Path.home() / 'transcript_edited.srt')
+        path, _ = QFileDialog.getSaveFileName(
+            self, 'SRTを書き出し' if _lang == 'ja' else 'Export SRT',
+            default, tr('dlg_srt_filter'))
+        if not path:
+            return
+        lines = []
+        for e in entries:
+            lines.append(str(e.index))
+            lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+            lines.append(e.text)
+            lines.append('')
+        try:
+            Path(path).write_text('\n'.join(lines), encoding='utf-8')
+        except Exception as exc:
+            QMessageBox.critical(self, tr('err_title'), f"Export failed:\n{exc}")
+            return
+        self.log.append((f'SRT書き出し完了: {path}') if _lang == 'ja' else f'SRT exported: {path}')
 
     def _on_row(self, row: int):
         if row < len(self.srt_tbl.entries):
@@ -3382,6 +3479,7 @@ class MainWindow(QMainWindow):
         self.lbl_video.setText(tr('video_none'))
         self.lbl_srt.setText(tr('srt_none'))
         self.btn_save_srt.setEnabled(False)
+        self.btn_export_srt.setEnabled(False)
         self.btn_export_eaf.setEnabled(False)
         self.btn_close_video.setEnabled(False)
         self.btn_transcribe.setEnabled(False)
