@@ -1339,34 +1339,43 @@ class WhisperWorker(QThread):
 
         elif self.fill_gaps:
             entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
-            new_entries = []
-            for i, entry in enumerate(entries):
-                new_entries.append(entry)
-                if i + 1 < len(entries):
-                    gap_ms = entries[i + 1].start_ms - entry.end_ms
-                    if gap_ms > 0:
-                        if self.fill_mode == 'blank':
-                            label = ''
-                        else:
-                            label = f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
-                        new_entries.append(SRTEntry(
-                            index=0,
-                            start_ms=entry.end_ms,
-                            end_ms=entries[i + 1].start_ms,
-                            text=label,
-                        ))
-            for idx, e in enumerate(new_entries):
-                e.index = idx + 1
-            lines = []
-            for e in new_entries:
-                lines.append(str(e.index))
-                lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
-                lines.append(e.text)
-                lines.append('')
-            srt.write_text('\n'.join(lines), encoding='utf-8')
-            inserted = len(new_entries) - len(entries)
-            mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
-            self.log.emit(f"  {'Gaps filled' if _lang=='en' else '敷き詰め完了'} ({mode_str}): +{inserted}")
+            if entries:
+                dur_ms = int(_media_duration(self.video) * 1000)
+
+                def _glabel(gap_ms):
+                    if self.fill_mode == 'blank':
+                        return ''
+                    return f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
+
+                new_entries = []
+                # 冒頭の隙間（0:00 〜 最初の発話）
+                if entries[0].start_ms > 0:
+                    g = entries[0].start_ms
+                    new_entries.append(SRTEntry(index=0, start_ms=0, end_ms=entries[0].start_ms, text=_glabel(g)))
+                # 発話間の隙間
+                for i, entry in enumerate(entries):
+                    new_entries.append(entry)
+                    if i + 1 < len(entries):
+                        gap_ms = entries[i + 1].start_ms - entry.end_ms
+                        if gap_ms > 0:
+                            new_entries.append(SRTEntry(index=0, start_ms=entry.end_ms,
+                                end_ms=entries[i + 1].start_ms, text=_glabel(gap_ms)))
+                # 末尾の隙間（最後の発話 〜 動画終端）
+                if dur_ms > 0 and entries[-1].end_ms < dur_ms:
+                    g = dur_ms - entries[-1].end_ms
+                    new_entries.append(SRTEntry(index=0, start_ms=entries[-1].end_ms, end_ms=dur_ms, text=_glabel(g)))
+                for idx, e in enumerate(new_entries):
+                    e.index = idx + 1
+                lines = []
+                for e in new_entries:
+                    lines.append(str(e.index))
+                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                    lines.append(e.text)
+                    lines.append('')
+                srt.write_text('\n'.join(lines), encoding='utf-8')
+                inserted = len(new_entries) - len(entries)
+                mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
+                self.log.emit(f"  {'Gaps filled' if _lang=='en' else '敷き詰め完了'} ({mode_str}): +{inserted}")
 
         self.done.emit(True, str(srt))
 
@@ -1519,28 +1528,37 @@ class BatchWhisperWorker(QThread):
 
             elif self.fill_gaps:
                 entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
-                new_entries = []
-                for j, entry in enumerate(entries):
-                    new_entries.append(entry)
-                    if j + 1 < len(entries):
-                        gap_ms = entries[j + 1].start_ms - entry.end_ms
-                        if gap_ms > 0:
-                            if self.fill_mode == 'blank':
-                                label = ''
-                            else:
-                                label = (f'[Pause  {gap_ms/1000:.1f}s]'
-                                         if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]')
-                            new_entries.append(SRTEntry(0, entry.end_ms,
-                                entries[j + 1].start_ms, label))
-                for idx, e in enumerate(new_entries):
-                    e.index = idx + 1
-                lines = []
-                for e in new_entries:
-                    lines.append(str(e.index))
-                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
-                    lines.append(e.text)
-                    lines.append('')
-                srt.write_text('\n'.join(lines), encoding='utf-8')
+                if entries:
+                    dur_ms = int(_media_duration(video) * 1000)
+
+                    def _glabel_b(gap_ms):
+                        if self.fill_mode == 'blank':
+                            return ''
+                        return f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
+
+                    new_entries = []
+                    if entries[0].start_ms > 0:
+                        g = entries[0].start_ms
+                        new_entries.append(SRTEntry(0, 0, entries[0].start_ms, _glabel_b(g)))
+                    for j, entry in enumerate(entries):
+                        new_entries.append(entry)
+                        if j + 1 < len(entries):
+                            gap_ms = entries[j + 1].start_ms - entry.end_ms
+                            if gap_ms > 0:
+                                new_entries.append(SRTEntry(0, entry.end_ms,
+                                    entries[j + 1].start_ms, _glabel_b(gap_ms)))
+                    if dur_ms > 0 and entries[-1].end_ms < dur_ms:
+                        g = dur_ms - entries[-1].end_ms
+                        new_entries.append(SRTEntry(0, entries[-1].end_ms, dur_ms, _glabel_b(g)))
+                    for idx, e in enumerate(new_entries):
+                        e.index = idx + 1
+                    lines = []
+                    for e in new_entries:
+                        lines.append(str(e.index))
+                        lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                        lines.append(e.text)
+                        lines.append('')
+                    srt.write_text('\n'.join(lines), encoding='utf-8')
 
             success += 1
             self.file_done.emit(i + 1, total, True, str(srt))
