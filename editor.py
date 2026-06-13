@@ -2207,33 +2207,29 @@ class EditTextCommand(QUndoCommand):
 # ──────────────────────────────────────────────────────────────────
 
 class SplitCommand(QUndoCommand):
-    def __init__(self, srt_table, row: int, text_a: str, text_b: str, split_ms: int):
-        super().__init__(f"分割 (行 {row + 1})" if _lang == 'ja' else f"Split (row {row + 1})")
+    """1行を任意個数に分割する。pieces: [(text, start_ms, end_ms), ...]"""
+    def __init__(self, srt_table, row: int, pieces):
+        n = len(pieces)
+        super().__init__(f"分割 (行 {row + 1} → {n}行)" if _lang == 'ja'
+                         else f"Split (row {row + 1} → {n})")
         self.srt_table = srt_table
         self.row       = row
-        self.text_a    = text_a
-        self.text_b    = text_b
-        self.split_ms  = split_ms
+        self.pieces    = pieces
+        self._orig     = None
 
     def redo(self):
         st = self.srt_table
-        orig = st.entries[self.row]
-        entry_a = SRTEntry(orig.index,     orig.start_ms, self.split_ms, self.text_a, orig.checked)
-        entry_b = SRTEntry(orig.index + 1, self.split_ms, orig.end_ms,   self.text_b, orig.checked)
-        st.entries[self.row] = entry_a
-        st.entries.insert(self.row + 1, entry_b)
+        self._orig = st.entries[self.row]
+        checked = self._orig.checked
+        new = [SRTEntry(0, s, e, t, checked) for (t, s, e) in self.pieces]
+        st.entries[self.row:self.row + 1] = new
         _reindex(st.entries)
         st._repopulate()
 
     def undo(self):
         st = self.srt_table
-        orig_a = st.entries[self.row]
-        orig_b = st.entries[self.row + 1]
-        merged = SRTEntry(orig_a.index, orig_a.start_ms, orig_b.end_ms,
-                          self.text_a + (' ' if self.text_a and self.text_b else '') + self.text_b,
-                          orig_a.checked)
-        st.entries[self.row] = merged
-        del st.entries[self.row + 1]
+        n = len(self.pieces)
+        st.entries[self.row:self.row + n] = [self._orig]
         _reindex(st.entries)
         st._repopulate()
 
@@ -2356,85 +2352,75 @@ class SplitDialog(QDialog):
         vbox = QVBoxLayout(self)
 
         # 説明
-        vbox.addWidget(QLabel('テキストをクリックして分割位置を選択してください。'
-                              if _lang == 'ja' else
-                              'Click in the text to choose the split point.'))
+        vbox.addWidget(QLabel(
+            '分割したい位置で改行してください（何分割でも可）。各行が1つの字幕になります。\n'
+            '時間は文字数に応じて自動配分されます（あとで微調整可）。'
+            if _lang == 'ja' else
+            'Press Enter where you want to split (any number). Each line becomes one subtitle.\n'
+            'Times are auto-distributed by character length (adjust later if needed).'))
 
-        # テキスト表示（クリックで分割点を選ぶ）
+        # テキスト（改行で分割）
         self.txt = QTextEdit()
         self.txt.setPlainText(self.entry.text)
-        self.txt.setMaximumHeight(80)
-        self.txt.setReadOnly(False)
-        self.txt.cursorPositionChanged.connect(self._on_cursor)
+        self.txt.setMinimumHeight(100)
+        self.txt.textChanged.connect(self._update_preview)
         vbox.addWidget(self.txt)
 
-        # プレビュー
+        # プレビュー（全ピースの時間範囲）
         self.lbl_preview = QLabel('')
         self.lbl_preview.setWordWrap(True)
+        self.lbl_preview.setStyleSheet('color:#666; font-size:11px;')
         vbox.addWidget(self.lbl_preview)
-
-        # 分割時間
-        hbox = QHBoxLayout()
-        hbox.addWidget(QLabel('分割時間:' if _lang == 'ja' else 'Split time:'))
-        self.spn_split = QDoubleSpinBox()
-        dur_sec = (self.entry.end_ms - self.entry.start_ms) / 1000
-        self.spn_split.setRange(self.entry.start_ms / 1000, self.entry.end_ms / 1000)
-        self.spn_split.setDecimals(3)
-        self.spn_split.setSingleStep(0.1)
-        mid = (self.entry.start_ms + self.entry.end_ms) / 2000
-        self.spn_split.setValue(mid)
-        self.spn_split.setSuffix(' 秒' if _lang == 'ja' else ' sec')
-        self.spn_split.valueChanged.connect(self._on_time_changed)
-        hbox.addWidget(self.spn_split)
-        hbox.addStretch()
-        vbox.addLayout(hbox)
 
         # ボタン
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
+        ok_btn = btns.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn.setText(('OK  (⌘↵)' if sys.platform == 'darwin' else 'OK  (Ctrl+↵)'))
+        ok_btn.setDefault(True)
         vbox.addWidget(btns)
 
+        # キーボードから手を離さずOK: Cmd/Ctrl + Return（Enter）
+        for combo in ('Meta+Return', 'Meta+Enter', 'Ctrl+Return', 'Ctrl+Enter'):
+            QShortcut(QKeySequence(combo), self).activated.connect(self.accept)
+
         self._update_preview()
 
-    def _on_cursor(self):
-        cursor = self.txt.textCursor()
-        pos    = cursor.position()
-        text   = self.txt.toPlainText()
-        total  = max(len(text), 1)
-        ratio  = pos / total
-        dur_ms = self.entry.end_ms - self.entry.start_ms
-        split_ms = self.entry.start_ms + int(dur_ms * ratio)
-        self.spn_split.blockSignals(True)
-        self.spn_split.setValue(split_ms / 1000)
-        self.spn_split.blockSignals(False)
-        self._split_pos = pos
-        self._update_preview()
+    def _pieces(self):
+        """改行で区切られたテキスト断片（空行は無視）。"""
+        return [ln.strip() for ln in self.txt.toPlainText().split('\n') if ln.strip()]
 
-    def _on_time_changed(self):
-        self._update_preview()
+    def _segments(self):
+        """戻り値: [(text, start_ms, end_ms), ...]。分割しない（1個以下）なら []。
+        境界時刻は各ピースの文字数に比例して [start, end] を配分する。"""
+        pieces = self._pieces()
+        if len(pieces) <= 1:
+            return []
+        start, end = self.entry.start_ms, self.entry.end_ms
+        span  = end - start
+        total = sum(len(p) for p in pieces) or 1
+        bounds = [start]
+        acc = 0
+        for p in pieces[:-1]:
+            acc += len(p)
+            bounds.append(start + int(span * acc / total))
+        bounds.append(end)
+        return [(pieces[i], bounds[i], bounds[i + 1]) for i in range(len(pieces))]
 
     def _update_preview(self):
-        cursor = self.txt.textCursor()
-        pos    = cursor.position()
-        text   = self.txt.toPlainText()
-        part_a = text[:pos].strip()
-        part_b = text[pos:].strip()
-        t      = self.spn_split.value()
-        self.lbl_preview.setText(
-            f'前半: 「{part_a}」  ({_ms_to_srt(self.entry.start_ms)} → {_ms_to_srt(int(t*1000))})\n'
-            f'後半: 「{part_b}」  ({_ms_to_srt(int(t*1000))} → {_ms_to_srt(self.entry.end_ms)})'
-        )
+        segs = self._segments()
+        if not segs:
+            self.lbl_preview.setText('（改行を入れると分割されます）' if _lang == 'ja'
+                                     else '(add line breaks to split)')
+            return
+        lines = [f'{i+1}. 「{t}」  {_ms_to_srt(s)} → {_ms_to_srt(e)}'
+                 for i, (t, s, e) in enumerate(segs)]
+        self.lbl_preview.setText('\n'.join(lines))
 
-    def result_values(self):
-        cursor = self.txt.textCursor()
-        pos    = cursor.position()
-        text   = self.txt.toPlainText()
-        text_a = text[:pos].strip()
-        text_b = text[pos:].strip()
-        split_ms = int(self.spn_split.value() * 1000)
-        return text_a, text_b, split_ms
+    def result_segments(self):
+        return self._segments()
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -2719,16 +2705,10 @@ class SRTTable(QWidget):
         dlg = SplitDialog(entry, self.window())
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        text_a, text_b, split_ms = dlg.result_values()
-        if not text_a and not text_b:
+        segs = dlg.result_segments()    # [(text, start_ms, end_ms), ...]
+        if len(segs) < 2:
             return
-        if split_ms <= entry.start_ms or split_ms >= entry.end_ms:
-            QMessageBox.warning(self.window(),
-                'エラー' if _lang == 'ja' else 'Error',
-                '分割時間が範囲外です' if _lang == 'ja' else 'Split time is out of range.')
-            return
-        cmd = SplitCommand(self, row, text_a, text_b, split_ms)
-        self.undo_stack.push(cmd)
+        self.undo_stack.push(SplitCommand(self, row, segs))
 
     def _merge_rows(self, rows: List[int]):
         # 連続行チェック
