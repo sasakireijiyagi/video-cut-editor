@@ -377,12 +377,15 @@ def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str):
                '--model', _MLX_MODELS[model],
                '--output-format', 'srt',
                '--output-dir', outdir,
-               '--verbose', 'True']
+               '--verbose', 'True',
+               # 直前の出力を次区間に渡さない＝「なるほど」等の繰り返しループ幻聴を防ぐ
+               '--condition-on-previous-text', 'False']
     else:
         cmd = [binpath, audio,
                '--model', model,
                '--output_format', 'srt',
-               '--output_dir', outdir]
+               '--output_dir', outdir,
+               '--condition_on_previous_text', 'False']
     if language != 'auto':
         cmd += ['--language', language]
     return cmd, engine
