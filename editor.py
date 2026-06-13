@@ -3004,9 +3004,10 @@ class MainWindow(QMainWindow):
 
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
-        # 再生位置の変化に合わせてSRT表を追従スクロール＆ハイライト（再生は誘発しない）
+        # スライダーをドラッグで動かしたときだけSRT表を追従（sliderMovedはユーザー操作時のみ発火）。
+        # positionChangedに繋がないことで、区間再生の終了時に選択が次行へ勝手に動くのを防ぐ。
         self._follow_row = -1
-        self.player.player.positionChanged.connect(self._follow_srt_to_position)
+        self.player.slider.sliderMoved.connect(self._follow_srt_to_position)
         self.spl.addWidget(self.srt_tbl)
 
         # 再生コントロールを右側（全選択行とステップ行の間）に配置
@@ -3390,9 +3391,8 @@ class MainWindow(QMainWindow):
             self.player.play_segment(self.srt_tbl.entries[row])
 
     def _follow_srt_to_position(self, pos: int):
-        """再生位置(ms)に対応するSRT行へ表をスクロール＆ハイライトする。
-        スライダー移動・再生のどちらでも追従。行クリックの play_segment を
-        誘発しないよう、選択中はテーブルのシグナルをブロックする。"""
+        """スライダーで動かした位置(ms)に対応するSRT行へ表をスクロール＆ハイライト。
+        行クリックの play_segment を誘発しないよう、選択中はテーブルのシグナルをブロックする。"""
         entries = self.srt_tbl.entries
         if not entries:
             return
