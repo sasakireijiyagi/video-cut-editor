@@ -486,6 +486,17 @@ def _parse_whisper_ts(line: str) -> float:
     return (int(h) if h else 0) * 3600 + int(mn) * 60 + float(s)
 
 
+def _unique_path(path: str) -> str:
+    """既存ファイルがあれば _2, _3… を付けて衝突しないパスを返す（上書き防止）。"""
+    if not os.path.exists(path):
+        return path
+    base, ext = os.path.splitext(path)
+    i = 2
+    while os.path.exists(f"{base}_{i}{ext}"):
+        i += 1
+    return f"{base}_{i}{ext}"
+
+
 def _is_ffmpeg_ok() -> bool:
     try:
         subprocess.run([FFMPEG_BIN, '-version'], capture_output=True, timeout=5)
@@ -1073,7 +1084,7 @@ class FFmpegWorker(QThread):
 
             start = _ms_to_ffmpeg(entry.start_ms)
             dur   = _ms_to_ffmpeg(entry.end_ms - entry.start_ms)
-            out   = os.path.join(self.outdir, f"{stem}_{entry.index:04d}.mp4")
+            out   = _unique_path(os.path.join(self.outdir, f"{stem}_{entry.index:04d}.mp4"))
 
             if self.subtitle_burn:
                 # セグメント単体SRT（0基準）を一時ファイルに書く
@@ -1115,7 +1126,7 @@ class FFmpegWorker(QThread):
                 for p in segs:
                     f.write(f"file '{p}'\n")
 
-            final = os.path.join(self.outdir, f"{stem}_combined.mp4")
+            final = _unique_path(os.path.join(self.outdir, f"{stem}_combined.mp4"))
             cmd = [FFMPEG_BIN, '-y', '-f', 'concat', '-safe', '0',
                    '-i', listfile, '-c', 'copy', final]
             self.log.emit("Combining..." if _lang == 'en' else "結合中...")
@@ -1158,7 +1169,7 @@ class FullExportWorker(QThread):
 
     def run(self):
         stem = Path(self.video).stem
-        out  = os.path.join(self.outdir, f"{stem}_full.mp4")
+        out  = _unique_path(os.path.join(self.outdir, f"{stem}_full.mp4"))
 
         if self.subtitle_burn:
             import tempfile
