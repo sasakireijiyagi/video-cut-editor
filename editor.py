@@ -6,8 +6,9 @@
 import sys
 import os
 import shutil
+import platform
 
-APP_VERSION = "1.0.10"
+APP_VERSION = "1.1.0"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -319,8 +320,93 @@ def _find_whisper() -> str:
                 return str(w_base)
     return 'whisper'
 
+def _find_mlx_whisper() -> str:
+    """mlx_whisper CLI を探す（Apple Silicon の Metal GPU 版）。無ければ ''。"""
+    w = shutil.which('mlx_whisper')
+    if w:
+        return w
+    conda_bases = [
+        '/opt/anaconda3', '/opt/miniconda3',
+        os.path.expanduser('~/anaconda3'),
+        os.path.expanduser('~/miniconda3'),
+        os.path.expanduser('~/miniforge3'),
+        os.path.expanduser('~/mambaforge'),
+    ]
+    for base in conda_bases:
+        hits = sorted(Path(base).glob('envs/*/bin/mlx_whisper'))
+        if hits:
+            return str(hits[0])
+        w_base = Path(base) / 'bin' / 'mlx_whisper'
+        if w_base.exists():
+            return str(w_base)
+    return ''
+
 FFMPEG_BIN  = _find_ffmpeg()
 WHISPER_BIN = _find_whisper()
+
+# ── 音声認識エンジン（Mac: mlx-whisper で Metal GPU / それ以外: openai-whisper） ──
+_IS_APPLE_SILICON = (sys.platform == 'darwin' and platform.machine() == 'arm64')
+MLX_WHISPER_BIN   = _find_mlx_whisper() if _IS_APPLE_SILICON else ''
+
+# UIのモデル名 → mlx-community の HF リポジトリ名（無いものは openai-whisper にフォールバック）
+_MLX_MODELS = {
+    'large-v3':       'mlx-community/whisper-large-v3-mlx',
+    'large-v3-turbo': 'mlx-community/whisper-large-v3-turbo',
+    'turbo':          'mlx-community/whisper-large-v3-turbo',
+    'large-v2':       'mlx-community/whisper-large-v2-mlx',
+    'medium':         'mlx-community/whisper-medium-mlx',
+    'small':          'mlx-community/whisper-small-mlx',
+    'base':           'mlx-community/whisper-base-mlx',
+    'tiny':           'mlx-community/whisper-tiny-mlx',
+}
+
+def _active_engine(model: str):
+    """このモデルで使うエンジンを決める。戻り値: ('mlx', bin) か ('openai', bin)。
+    Apple Silicon かつ mlx_whisper があり、モデルに mlx 版がある場合のみ mlx。"""
+    if _IS_APPLE_SILICON and MLX_WHISPER_BIN and model in _MLX_MODELS:
+        return ('mlx', MLX_WHISPER_BIN)
+    return ('openai', WHISPER_BIN)
+
+def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str):
+    """文字起こしの subprocess コマンドを組む。戻り値: (cmd:list, engine:str)。
+    mlx_whisper と openai-whisper はフラグ名が異なる（ハイフン/アンダースコア・--verbose）
+    ので、その差をここに集約する。stdout の区間行フォーマットは両者同一。"""
+    engine, binpath = _active_engine(model)
+    if engine == 'mlx':
+        cmd = [binpath, audio,
+               '--model', _MLX_MODELS[model],
+               '--output-format', 'srt',
+               '--output-dir', outdir,
+               '--verbose', 'True']
+    else:
+        cmd = [binpath, audio,
+               '--model', model,
+               '--output_format', 'srt',
+               '--output_dir', outdir]
+    if language != 'auto':
+        cmd += ['--language', language]
+    return cmd, engine
+
+def _is_engine_noise(line: str) -> bool:
+    """mlx_whisper が冒頭に出す内部ログ行（区間とは無関係）はログ表示から間引く。"""
+    return line.startswith('Args: {') or line.startswith('Fetching ')
+
+def _cached_models() -> set:
+    """ダウンロード済みの（UIモデル名の）集合を返す。ドロップダウンの★表示用。
+    openai は ~/.cache/whisper/<x>.pt、mlx は HF キャッシュの
+    ~/.cache/huggingface/hub/models--mlx-community--whisper-<x> を見る。"""
+    out = set()
+    cache_dir = Path.home() / '.cache' / 'whisper'
+    if cache_dir.is_dir():
+        out |= {p.stem for p in cache_dir.glob('*.pt')}
+    if _IS_APPLE_SILICON and MLX_WHISPER_BIN:
+        hub = Path.home() / '.cache' / 'huggingface' / 'hub'
+        if hub.is_dir():
+            present = {p.name for p in hub.glob('models--mlx-community--whisper-*')}
+            for ui_name, repo in _MLX_MODELS.items():
+                if ('models--' + repo.replace('/', '--')) in present:
+                    out.add(ui_name)
+    return out
 
 
 # ── クラウド同期ファイル（Dropbox等）のダウンロード検知・実体化 ──
@@ -391,11 +477,17 @@ def _is_ffmpeg_ok() -> bool:
         return False
 
 def _is_whisper_ok() -> bool:
-    try:
-        subprocess.run([WHISPER_BIN, '--help'], capture_output=True, timeout=5)
-        return True
-    except Exception:
-        return False
+    # Apple Silicon は mlx_whisper があればOK。無ければ openai-whisper を確認。
+    bins = [MLX_WHISPER_BIN, WHISPER_BIN] if (_IS_APPLE_SILICON and MLX_WHISPER_BIN) else [WHISPER_BIN]
+    for b in bins:
+        if not b:
+            continue
+        try:
+            subprocess.run([b, '--help'], capture_output=True, timeout=5)
+            return True
+        except Exception:
+            continue
+    return False
 
 class SetupDialog(QDialog):
     """ffmpeg / Whisper が見つからないときに自動インストールを提案するダイアログ"""
@@ -417,7 +509,8 @@ class SetupDialog(QDialog):
         layout.addWidget(QLabel(msg))
 
         self.chk_ffmpeg  = QCheckBox('ffmpeg')
-        self.chk_whisper = QCheckBox('Whisper (openai-whisper)')
+        self.chk_whisper = QCheckBox('Whisper (mlx-whisper・GPU対応)'
+                                     if _IS_APPLE_SILICON else 'Whisper (openai-whisper)')
         self.chk_ffmpeg.setChecked(missing_ffmpeg)
         self.chk_whisper.setChecked(missing_whisper)
         self.chk_ffmpeg.setEnabled(missing_ffmpeg)
@@ -524,9 +617,11 @@ class SetupWorker(QThread):
                     self.log_line.emit('https://ffmpeg.org/download.html')
 
             if self.do_whisper:
-                self.log_line.emit('Whisperをインストール中...')
+                # Apple Silicon は Metal GPU 対応の mlx-whisper、それ以外は openai-whisper
+                pkg = 'mlx-whisper' if _IS_APPLE_SILICON else 'openai-whisper'
+                self.log_line.emit(f'Whisper（{pkg}）をインストール中...')
                 proc = subprocess.Popen(
-                    [sys.executable, '-m', 'pip', 'install', 'openai-whisper'],
+                    [sys.executable, '-m', 'pip', 'install', pkg],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
                     self.log_line.emit(line.rstrip())
@@ -1122,14 +1217,9 @@ class WhisperWorker(QThread):
             _materialize(self.video, progress_cb=_dl)
             self.log.emit('📥 ダウンロード完了' if _lang == 'ja' else '📥 Download complete')
 
-        cmd = [WHISPER_BIN, self.video,
-               '--model', self.model,
-               '--output_format', 'srt',
-               '--output_dir', outdir]
-        if self.language != 'auto':
-            cmd += ['--language', self.language]
+        cmd, engine = _build_transcribe_cmd(self.video, self.model, self.language, outdir)
 
-        self.log.emit(f"Whisper: model={self.model}  lang={self.language}")
+        self.log.emit(f"Whisper: engine={engine}  model={self.model}  lang={self.language}")
         self.log.emit('モデル読み込み中…（初回は10〜30秒ほどかかります）'
                       if _lang == 'ja' else
                       'Loading model… (the first run takes 10–30 seconds)')
@@ -1146,7 +1236,7 @@ class WhisperWorker(QThread):
             )
             for line in self._proc.stdout:
                 line = line.rstrip()
-                if line:
+                if line and not _is_engine_noise(line):
                     self.log.emit(line)
             self._proc.wait()
         except Exception as exc:
@@ -1278,12 +1368,7 @@ class BatchWhisperWorker(QThread):
                           'Loading model… (the first run takes 10–30 seconds)')
 
             outdir = str(Path(video).parent)
-            cmd = [WHISPER_BIN, video,
-                   '--model', self.model,
-                   '--output_format', 'srt',
-                   '--output_dir', outdir]
-            if self.language != 'auto':
-                cmd += ['--language', self.language]
+            cmd, _engine = _build_transcribe_cmd(video, self.model, self.language, outdir)
 
             try:
                 self._proc = subprocess.Popen(
@@ -1291,7 +1376,7 @@ class BatchWhisperWorker(QThread):
                     text=True, bufsize=1, env=env)
                 for line in self._proc.stdout:
                     line = line.rstrip()
-                    if line:
+                    if line and not _is_engine_noise(line):
                         self.log.emit(line)
                         if '-->' in line:        # whisperの区間出力行＝進捗の鼓動
                             self.seg_tick.emit()
@@ -1404,8 +1489,7 @@ class BatchDialog(QDialog):
         cfg = QHBoxLayout()
         cfg.addWidget(QLabel('モデル:' if _lang == 'ja' else 'Model:'))
         self.cmb_model = QComboBox()
-        cache_dir = Path.home() / '.cache' / 'whisper'
-        cached = {p.stem for p in cache_dir.glob('*.pt')} if cache_dir.is_dir() else set()
+        cached = _cached_models()
         for m in ['large-v3','large-v3-turbo','turbo','medium','small','base','tiny']:
             self.cmb_model.addItem(f'★ {m}' if m in cached else m)
         # デフォルトモデルを選択
@@ -3346,10 +3430,7 @@ class MainWindow(QMainWindow):
         self.worker.start()
 
     def _populate_models(self):
-        cache_dir = Path.home() / '.cache' / 'whisper'
-        cached = set()
-        if cache_dir.is_dir():
-            cached = {p.stem for p in cache_dir.glob('*.pt')}
+        cached = _cached_models()
 
         all_models = [
             'large-v3', 'large-v3-turbo', 'turbo',
