@@ -3004,6 +3004,9 @@ class MainWindow(QMainWindow):
 
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
+        # 再生位置の変化に合わせてSRT表を追従スクロール＆ハイライト（再生は誘発しない）
+        self._follow_row = -1
+        self.player.player.positionChanged.connect(self._follow_srt_to_position)
         self.spl.addWidget(self.srt_tbl)
 
         # 再生コントロールを右側（全選択行とステップ行の間）に配置
@@ -3323,6 +3326,7 @@ class MainWindow(QMainWindow):
         self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
         self.btn_save_srt.setEnabled(True)
         self.btn_export_srt.setEnabled(True)
+        self._follow_row = -1
         self.log.append(tr('log_srt_loaded').format(n=len(entries), path=path))
 
     def _save_srt(self):
@@ -3384,6 +3388,29 @@ class MainWindow(QMainWindow):
     def _on_row(self, row: int):
         if row < len(self.srt_tbl.entries):
             self.player.play_segment(self.srt_tbl.entries[row])
+
+    def _follow_srt_to_position(self, pos: int):
+        """再生位置(ms)に対応するSRT行へ表をスクロール＆ハイライトする。
+        スライダー移動・再生のどちらでも追従。行クリックの play_segment を
+        誘発しないよう、選択中はテーブルのシグナルをブロックする。"""
+        entries = self.srt_tbl.entries
+        if not entries:
+            return
+        row = -1
+        for i, e in enumerate(entries):
+            if e.start_ms <= pos < e.end_ms:
+                row = i
+                break
+        if row < 0 or row == self._follow_row:
+            return            # 区間外（無音など）／同じ行なら何もしない
+        self._follow_row = row
+        tbl = self.srt_tbl.tbl
+        tbl.blockSignals(True)
+        tbl.selectRow(row)
+        tbl.blockSignals(False)
+        item = tbl.item(row, 0)
+        if item:
+            tbl.scrollToItem(item, QAbstractItemView.ScrollHint.PositionAtCenter)
 
     def _preview_subtitle(self):
         if not self.video_path:
