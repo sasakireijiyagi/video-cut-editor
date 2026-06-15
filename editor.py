@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.7"
+APP_VERSION = "1.1.8"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -3142,6 +3142,7 @@ class MainWindow(QMainWindow):
         self._build_menu()
         QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
             self.srt_tbl._open_find_replace)
+        QShortcut(QKeySequence('Ctrl+S'), self).activated.connect(self._save_srt)
 
     def _build(self):
         root = QWidget()
