@@ -91,7 +91,7 @@ STRINGS = {
         'mark_silence_tip'  : '発話間の無音区間をSRTに[間 X.X秒]として挿入する',
         'silence_suffix'    : ' 秒以上',
         'silence_tip'       : 'この秒数以上の無音を[間]として記録する',
-        'fill_gaps'         : '敷き詰め',
+        'fill_gaps'         : 'しきつめ',
         'fill_gaps_tip'     : '発話間のすべての隙間にエントリを挿入する（会話分析向け）',
         'fill_mode_label'   : '[間]表示',
         'fill_mode_blank'   : '空欄',
@@ -1375,7 +1375,7 @@ class WhisperWorker(QThread):
                 srt.write_text('\n'.join(lines), encoding='utf-8')
                 inserted = len(new_entries) - len(entries)
                 mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
-                self.log.emit(f"  {'Gaps filled' if _lang=='en' else '敷き詰め完了'} ({mode_str}): +{inserted}")
+                self.log.emit(f"  {'Gaps filled' if _lang=='en' else 'しきつめ完了'} ({mode_str}): +{inserted}")
 
         self.done.emit(True, str(srt))
 
@@ -1648,7 +1648,7 @@ class BatchDialog(QDialog):
         cfg.addWidget(self.chk_silence)
         cfg.addWidget(self.spn_silence)
         cfg.addSpacing(12)
-        self.chk_fill_gaps = QCheckBox('敷き詰め' if _lang == 'ja' else 'Fill All Gaps')
+        self.chk_fill_gaps = QCheckBox('しきつめ' if _lang == 'ja' else 'Fill All Gaps')
         self.chk_fill_gaps.setToolTip('発話間のすべての隙間にエントリを挿入する' if _lang == 'ja'
                                       else 'Insert an entry for every gap between utterances')
         self.chk_fill_gaps.setChecked(self._default_fill_gaps)
@@ -3776,7 +3776,7 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(
             self,
             'EAFファイルを保存' if _lang == 'ja' else 'Save EAF file',
-            default, 'ELAN EAF (*.eaf);;すべて (*)')
+            default, 'ELAN EAF (*.eaf);;' + ('すべて (*)' if _lang == 'ja' else 'All (*)'))
         if not path:
             return
 
@@ -3991,10 +3991,14 @@ class MainWindow(QMainWindow):
 
         star_lbl = QLabel(
             "<p style='text-align:center; font-size:13px;'>"
-            "役に立ったら "
-            "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>⭐ Star</a>"
-            " をつけてもらえると励みになります！"
-            "</p>"
+            + ("役に立ったら "
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>⭐ Star</a>"
+               " をつけてもらえると励みになります！"
+               if _lang == 'ja' else
+               "If you find it useful, please give it a "
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>⭐ Star</a>"
+               "!")
+            + "</p>"
         )
         star_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         star_lbl.setOpenExternalLinks(True)
@@ -4002,14 +4006,20 @@ class MainWindow(QMainWindow):
 
         links = QLabel(
             "<p style='text-align:center;'>"
-            "<a href='https://sasakireijiyagi.github.io/video-cut-editor/'>ダウンロードページ</a>"
-            "　｜　"
-            "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
-            "　｜　"
-            "<a href='https://github.com/sasakireijiyagi/video-cut-editor/issues'>💬 感想・バグ報告</a>"
-            "　｜　"
-            f"<a href='https://donate.sasakireijiyagi.com/'>{tr('about_donate_link')}</a>"
-            "</p>"
+            + (f"<a href='https://sasakireijiyagi.github.io/video-cut-editor/'>ダウンロードページ</a>"
+               "　｜　"
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
+               "　｜　"
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor/issues'>💬 感想・バグ報告</a>"
+               if _lang == 'ja' else
+               "<a href='https://sasakireijiyagi.github.io/video-cut-editor/'>Download page</a>"
+               " | "
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor'>GitHub</a>"
+               " | "
+               "<a href='https://github.com/sasakireijiyagi/video-cut-editor/issues'>💬 Feedback / Bug report</a>")
+            + "　｜　"
+            + f"<a href='https://donate.sasakireijiyagi.com/'>{tr('about_donate_link')}</a>"
+            + "</p>"
         )
         links.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links.setOpenExternalLinks(True)
@@ -4027,7 +4037,7 @@ class MainWindow(QMainWindow):
         progress_bar.hide()
         layout.addWidget(progress_bar)
 
-        check_btn = QPushButton("アップデートを確認")
+        check_btn = QPushButton("アップデートを確認" if _lang == 'ja' else "Check for updates")
         check_btn.setFixedWidth(180)
         check_btn_wrap = QWidget()
         check_btn_layout = QHBoxLayout(check_btn_wrap)
@@ -4051,7 +4061,8 @@ class MainWindow(QMainWindow):
                 progress_bar.hide()
                 ver_lbl.setText(
                     "<p style='text-align:center; color:#2a8a55; font-size:11px;'>"
-                    "インストール完了！再起動します…</p>"
+                    + ("インストール完了！再起動します…" if _lang == 'ja' else "Install complete! Restarting…")
+                    + "</p>"
                 )
                 if sys.platform == "darwin":
                     # Mac: シェルスクリプトで _new.app に差し替えて再起動
@@ -4093,7 +4104,8 @@ class MainWindow(QMainWindow):
                 progress_bar.hide()
                 ver_lbl.setText(
                     f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
-                    f"失敗: {msg}</p>"
+                    + (f"失敗: {msg}" if _lang == 'ja' else f"Failed: {msg}")
+                    + "</p>"
                 )
                 check_btn.show()
 
@@ -4104,7 +4116,7 @@ class MainWindow(QMainWindow):
 
         def _check_version():
             check_btn.setEnabled(False)
-            check_btn.setText("確認中…")
+            check_btn.setText("確認中…" if _lang == 'ja' else "Checking…")
             worker = VersionCheckWorker()
 
             def _on_result(tag, url, dmg_url):
@@ -4112,10 +4124,11 @@ class MainWindow(QMainWindow):
                 if latest and latest > APP_VERSION:
                     ver_lbl.setText(
                         f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
-                        f"v{latest} が利用可能！</p>"
+                        + (f"v{latest} が利用可能！" if _lang == 'ja' else f"v{latest} is available!")
+                        + "</p>"
                     )
                     if dmg_url:
-                        check_btn.setText(f"v{latest} にアップデート")
+                        check_btn.setText(f"v{latest} にアップデート" if _lang == 'ja' else f"Update to v{latest}")
                         check_btn.setEnabled(True)
                         check_btn.clicked.disconnect()
                         check_btn.clicked.connect(lambda: _do_update(dmg_url, latest))
@@ -4124,14 +4137,17 @@ class MainWindow(QMainWindow):
                         ver_lbl.setOpenExternalLinks(True)
                         ver_lbl.setText(
                             f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
-                            f"v{latest} が利用可能です。<br>"
-                            f"<a href='{landing}'>ダウンロードページ</a>から最新版をインストールしてください。</p>"
+                            + (f"v{latest} が利用可能です。<br><a href='{landing}'>ダウンロードページ</a>から最新版をインストールしてください。"
+                               if _lang == 'ja' else
+                               f"v{latest} is available.<br>Please install the latest version from the <a href='{landing}'>download page</a>.")
+                            + "</p>"
                         )
                         check_btn.hide()
                 else:
                     ver_lbl.setText(
                         f"<p style='text-align:center; color:#2a8a55; font-size:11px;'>"
-                        f"v{APP_VERSION}（最新です）</p>"
+                        + (f"v{APP_VERSION}（最新です）" if _lang == 'ja' else f"v{APP_VERSION} (up to date)")
+                        + "</p>"
                     )
                     check_btn.hide()
 
@@ -4140,11 +4156,13 @@ class MainWindow(QMainWindow):
                 ver_lbl.setOpenExternalLinks(True)
                 ver_lbl.setText(
                     f"<p style='text-align:center; color:#888; font-size:11px;'>"
-                    f"確認に失敗しました。<br>"
-                    f"<a href='{landing}'>ダウンロードページ</a>で最新版を確認してください。</p>"
+                    + (f"確認に失敗しました。<br><a href='{landing}'>ダウンロードページ</a>で最新版を確認してください。"
+                       if _lang == 'ja' else
+                       f"Check failed.<br>Please visit the <a href='{landing}'>download page</a> for the latest version.")
+                    + "</p>"
                 )
                 check_btn.setEnabled(True)
-                check_btn.setText("再試行")
+                check_btn.setText("再試行" if _lang == 'ja' else "Retry")
 
             worker.result.connect(_on_result)
             worker.error.connect(_on_error)
