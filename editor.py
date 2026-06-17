@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.8"
+APP_VERSION = "1.1.9"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -655,7 +655,8 @@ class SetupWorker(QThread):
                     self.log_line.emit('ffmpegをインストール中（winget）...')
                     proc = subprocess.Popen(
                         ['winget', 'install', '--id', 'Gyan.FFmpeg', '-e', '--silent'],
-                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        encoding='utf-8', errors='replace')
                     for line in proc.stdout:
                         self.log_line.emit(line.rstrip())
                     proc.wait()
@@ -1284,7 +1285,7 @@ class WhisperWorker(QThread):
         try:
             self._proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, bufsize=1, env=env,
+                encoding='utf-8', errors='replace', bufsize=1, env=env,
             )
             for line in self._proc.stdout:
                 line = line.rstrip()
@@ -1468,7 +1469,7 @@ class BatchWhisperWorker(QThread):
             try:
                 self._proc = subprocess.Popen(
                     cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, bufsize=1, env=env)
+                    encoding='utf-8', errors='replace', bufsize=1, env=env)
                 for line in self._proc.stdout:
                     line = line.rstrip()
                     if line and not _is_engine_noise(line):
@@ -3892,6 +3893,12 @@ class MainWindow(QMainWindow):
         self.cmb_model.setCurrentIndex(default_idx)
 
     def _transcribe(self):
+        if not _is_whisper_ok():
+            QMessageBox.warning(self, tr('err_title'),
+                'Whisperがインストールされていません。\nメニュー「ヘルプ」からセットアップを実行してください。'
+                if _lang == 'ja' else
+                'Whisper is not installed.\nRun Setup from the Help menu.')
+            return
         model = self.cmb_model.currentText().lstrip('★ ')
         lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
 
