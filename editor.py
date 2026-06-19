@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.9"
+APP_VERSION = "1.1.10"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -295,6 +295,22 @@ def _find_whisper() -> str:
     if w:
         return w
     if sys.platform == 'win32':
+        # Windows: pip install 先の Scripts フォルダを探す
+        pip_scripts = []
+        # ユーザーローカルインストール (pip install --user)
+        local_app = os.environ.get('LOCALAPPDATA', '')
+        if local_app:
+            pip_scripts += sorted(Path(local_app).glob('Programs/Python/Python*/Scripts/whisper.exe'))
+        # システムワイドインストール
+        for prog in [r'C:\Python311', r'C:\Python310', r'C:\Python312', r'C:\Python39',
+                     r'C:\Program Files\Python311', r'C:\Program Files\Python310']:
+            pip_scripts += [Path(prog) / 'Scripts' / 'whisper.exe']
+        # pip install --user のもう一つのパス
+        user_profile = os.path.expanduser('~')
+        pip_scripts += sorted(Path(user_profile).glob('AppData/Roaming/Python/Python*/Scripts/whisper.exe'))
+        for p in pip_scripts:
+            if Path(p).exists():
+                return str(p)
         # Windows conda: Scripts/whisper.exe
         conda_bases = [
             os.path.expanduser('~/anaconda3'),
@@ -304,7 +320,6 @@ def _find_whisper() -> str:
             r'C:\ProgramData\miniconda3',
         ]
         for base in conda_bases:
-            # envs 内を検索
             hits = sorted(Path(base).glob('envs/*/Scripts/whisper.exe'))
             if hits:
                 return str(hits[0])
@@ -611,6 +626,10 @@ class SetupDialog(QDialog):
         self.progress.setVisible(False)
         self.btn_skip.setEnabled(True)
         if success:
+            # インストール後にWHISPER_BIN/FFMPEG_BINを再評価
+            global WHISPER_BIN, FFMPEG_BIN
+            WHISPER_BIN = _find_whisper()
+            FFMPEG_BIN  = _find_ffmpeg()
             if sys.platform == 'win32':
                 msg = 'インストール完了！PCを再起動してからアプリを起動してください。' if _lang == 'ja' else 'Installation complete! Please restart your PC, then launch the app again.'
             else:
@@ -1086,9 +1105,14 @@ class FFmpegWorker(QThread):
         segs: List[str] = []
         for i, entry in enumerate(checked):
             if self._stop:
-                self.done.emit(False, "Cancelled." if _lang == 'en' else "キャンセルされました")
+                for p in segs:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
                 if tmp_srt and os.path.exists(tmp_srt):
                     os.remove(tmp_srt)
+                self.done.emit(False, "Cancelled." if _lang == 'en' else "キャンセルされました")
                 return
 
             start = _ms_to_ffmpeg(entry.start_ms)
@@ -1623,8 +1647,10 @@ class BatchDialog(QDialog):
         cfg.addWidget(QLabel('モデル:' if _lang == 'ja' else 'Model:'))
         self.cmb_model = QComboBox()
         cached = _cached_models()
-        for m in ['large-v3','large-v3-turbo','turbo','medium','small','base','tiny']:
-            self.cmb_model.addItem(f'★ {m}' if m in cached else m)
+        for m in ['large-v3-turbo','large-v3','turbo','medium','small','base','tiny']:
+            cached_mark = '★ ' if m in cached else ''
+            rec = (' ◀ 推奨' if _lang == 'ja' else ' ◀ recommended') if m == 'large-v3-turbo' else ''
+            self.cmb_model.addItem(f'{cached_mark}{m}{rec}')
         # デフォルトモデルを選択
         stem = self._default_model
         for i in range(self.cmb_model.count()):
@@ -1760,7 +1786,7 @@ class BatchDialog(QDialog):
                 'ファイルを追加してください' if _lang == 'ja' else 'Please add files.')
             return
 
-        model = self.cmb_model.currentText().lstrip('★ ')
+        model = self.cmb_model.currentText().lstrip('★ ').split(' ')[0]
         lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
 
         fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
@@ -3412,7 +3438,7 @@ class MainWindow(QMainWindow):
     def _open_batch(self):
         dlg = BatchDialog(
             self,
-            model=self.cmb_model.currentText().lstrip('★ '),
+            model=self.cmb_model.currentText().lstrip('★ ').split(' ')[0],
             language=self.cmb_lang.currentText(),
             mark_silence=self.chk_mark_silence.isChecked(),
             silence_sec=self.spn_silence.value(),
@@ -3880,14 +3906,15 @@ class MainWindow(QMainWindow):
         cached = _cached_models()
 
         all_models = [
-            'large-v3', 'large-v3-turbo', 'turbo',
+            'large-v3-turbo', 'large-v3', 'turbo',
             'medium', 'small', 'base', 'tiny',
             'large-v2', 'large-v1',
         ]
         default_idx = 0
         for i, m in enumerate(all_models):
-            label = f'★ {m}' if m in cached else m
-            self.cmb_model.addItem(label)
+            cached_mark = '★ ' if m in cached else ''
+            rec = (' ◀ 推奨' if _lang == 'ja' else ' ◀ recommended') if m == 'large-v3-turbo' else ''
+            self.cmb_model.addItem(f'{cached_mark}{m}{rec}')
             if m in cached and default_idx == 0:
                 default_idx = i
         self.cmb_model.setCurrentIndex(default_idx)
@@ -3899,7 +3926,7 @@ class MainWindow(QMainWindow):
                 if _lang == 'ja' else
                 'Whisper is not installed.\nRun Setup from the Help menu.')
             return
-        model = self.cmb_model.currentText().lstrip('★ ')
+        model = self.cmb_model.currentText().lstrip('★ ').split(' ')[0]
         lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
 
         fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
