@@ -100,6 +100,11 @@ A terminal will open and run setup automatically. Press Enter when done.
 
 ## Setup — Windows
 
+> **Using the installer version (recommended)?**
+> Just extract the ZIP and double-click `EasyTranscribe.exe` — **none of the steps below are needed.**
+> The following instructions are **for developers who want to run from source code only**.
+
+
 ### 1. Install ffmpeg
 
 Download a prebuilt binary from [ffmpeg.org](https://ffmpeg.org/download.html), extract to `C:\ffmpeg`, and add `C:\ffmpeg\bin` to your system PATH.
