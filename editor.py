@@ -301,6 +301,9 @@ def _find_whisper() -> str:
         local_app = os.environ.get('LOCALAPPDATA', '')
         if local_app:
             pip_scripts += sorted(Path(local_app).glob('Programs/Python/Python*/Scripts/whisper.exe'))
+            # Microsoft Store 版 Python（Windows 10/11 でよく使われる）
+            pip_scripts += sorted(Path(local_app).glob(
+                'Packages/PythonSoftwareFoundation.Python.3.*/LocalCache/local-packages/Python3*/Scripts/whisper.exe'))
         # システムワイドインストール
         for prog in [r'C:\Python311', r'C:\Python310', r'C:\Python312', r'C:\Python39',
                      r'C:\Program Files\Python311', r'C:\Program Files\Python310']:
