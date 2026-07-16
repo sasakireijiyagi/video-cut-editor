@@ -458,7 +458,7 @@
 
 
   <section class="citation-section" id="changelog-section" style="display:none;">
-    <p class="section-label">What's New</p>
+    <p class="section-label">更新履歴</p>
     <div class="citation-box">
       <div id="changelog-list"></div>
       <p style="margin-top:1rem;"><a href="https://github.com/sasakireijiyagi/video-cut-editor/releases" target="_blank">すべての更新履歴を見る →</a></p>
@@ -505,16 +505,20 @@
       if (!withNotes.length) return;
       const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-      const html = withNotes.map(rel => {
-        const date = new Date(rel.published_at).toLocaleDateString('ja-JP');
+      const html = withNotes.map((rel, i) => {
+        const d = new Date(rel.published_at);
+        const date = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
         const items = rel.body.split('\n').map(line => {
           line = line.trim();
-          if (line.startsWith('- ')) return '<li>' + md(line.slice(2)) + '</li>';
+          if (line.startsWith('- ')) return '<li style="margin:0.25rem 0;">' + md(line.slice(2)) + '</li>';
           if (line) return '<p style="margin:0.4rem 0;">' + md(line) + '</p>';
           return '';
         }).join('');
+        const latestBadge = i === 0
+          ? ' <span style="background:#2e7d32; color:#fff; font-size:0.7rem; font-weight:700; padding:0.15rem 0.5rem; border-radius:99px; vertical-align:middle;">最新版</span>'
+          : '';
         return '<div style="margin-bottom:1.2rem;">'
-          + '<p style="font-weight:700; margin-bottom:0.3rem;">' + esc(rel.tag_name)
+          + '<p style="font-weight:700; margin-bottom:0.3rem;">バージョン ' + esc(rel.tag_name.replace(/^v/, '')) + latestBadge
           + ' <span style="font-weight:400; font-size:0.85rem; color:#999;">' + date + '</span></p>'
           + '<ul style="margin:0; padding-left:1.3rem;">' + items + '</ul>'
           + '</div>';
