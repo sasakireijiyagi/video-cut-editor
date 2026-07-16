@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.11"
+APP_VERSION = "1.1.12"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -532,15 +532,18 @@ def _is_ffmpeg_ok() -> bool:
 
 def _is_whisper_ok() -> bool:
     # Apple Silicon は mlx_whisper があればOK。無ければ openai-whisper を確認。
+    # 注意: `whisper --help` の実行確認はしない。openai-whisper は torch 読み込みで
+    # 起動に5秒以上かかる環境があり、timeout で「未インストール」誤判定になるため、
+    # バイナリの実在確認のみ行う（壊れたインストールは文字起こし実行時にエラー表示される）。
     bins = [MLX_WHISPER_BIN, WHISPER_BIN] if (_IS_APPLE_SILICON and MLX_WHISPER_BIN) else [WHISPER_BIN]
     for b in bins:
         if not b:
             continue
-        try:
-            subprocess.run([b, '--help'], capture_output=True, timeout=5)
+        if os.sep in b:
+            if os.path.exists(b):
+                return True
+        elif shutil.which(b):
             return True
-        except Exception:
-            continue
     return False
 
 class SetupDialog(QDialog):
