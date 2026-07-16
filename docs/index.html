@@ -457,6 +457,14 @@
   </section>
 
 
+  <section class="citation-section" id="changelog-section" style="display:none;">
+    <p class="section-label">What's New</p>
+    <div class="citation-box">
+      <div id="changelog-list"></div>
+      <p style="margin-top:1rem;"><a href="https://github.com/sasakireijiyagi/video-cut-editor/releases" target="_blank">すべての更新履歴を見る →</a></p>
+    </div>
+  </section>
+
   <section class="citation-section">
     <p class="section-label">Citation</p>
     <div class="citation-box">
@@ -486,6 +494,33 @@
     .then(d => {
       const el = document.getElementById('download-count');
       if (el && d.total > 0) el.innerHTML = 'Downloads <span>' + d.total.toLocaleString() + '</span>';
+    })
+    .catch(() => {});
+
+  // 更新履歴（GitHub Releases から直近3件・ノートがあるものだけ表示）
+  fetch('https://api.github.com/repos/sasakireijiyagi/video-cut-editor/releases?per_page=10')
+    .then(r => r.json())
+    .then(releases => {
+      const withNotes = releases.filter(rel => rel.body && rel.body.trim()).slice(0, 3);
+      if (!withNotes.length) return;
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      const html = withNotes.map(rel => {
+        const date = new Date(rel.published_at).toLocaleDateString('ja-JP');
+        const items = rel.body.split('\n').map(line => {
+          line = line.trim();
+          if (line.startsWith('- ')) return '<li>' + md(line.slice(2)) + '</li>';
+          if (line) return '<p style="margin:0.4rem 0;">' + md(line) + '</p>';
+          return '';
+        }).join('');
+        return '<div style="margin-bottom:1.2rem;">'
+          + '<p style="font-weight:700; margin-bottom:0.3rem;">' + esc(rel.tag_name)
+          + ' <span style="font-weight:400; font-size:0.85rem; color:#999;">' + date + '</span></p>'
+          + '<ul style="margin:0; padding-left:1.3rem;">' + items + '</ul>'
+          + '</div>';
+      }).join('');
+      document.getElementById('changelog-list').innerHTML = html;
+      document.getElementById('changelog-section').style.display = '';
     })
     .catch(() => {});
 </script>
