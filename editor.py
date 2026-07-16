@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.12"
+APP_VERSION = "1.1.13"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -386,10 +386,27 @@ _MLX_MODELS = {
     'tiny':           'mlx-community/whisper-tiny-mlx',
 }
 
+def _real_python_on_path() -> str:
+    """PATH上の実行可能な本物のPythonを返す。無ければ ''。
+    Windowsでは Python 未インストールでも Microsoft Store 誘導用の偽 python.exe
+    （実行エイリアス・実行すると失敗する）が PATH に存在するため、
+    `--version` が成功するかで本物と見分ける。"""
+    for cmd in ('python3', 'python'):
+        p = shutil.which(cmd)
+        if not p:
+            continue
+        try:
+            r = subprocess.run([p, '--version'], capture_output=True, text=True, timeout=15)
+            if r.returncode == 0 and 'Python' in (r.stdout + r.stderr):
+                return p
+        except Exception:
+            continue
+    return ''
+
 def _pip_python() -> str:
     """`pip install` を実行する Python を返す。ソース実行なら sys.executable。
     凍結アプリ(PyInstaller)では sys.executable はアプリ本体でpipが無いため、
-    既存whisper/mlxと同じ環境のpython（アプリが探す場所と一致）→ python3 の順で探す。"""
+    既存whisper/mlxと同じ環境のpython（アプリが探す場所と一致）→ PATH上の本物 の順で探す。"""
     if not getattr(sys, 'frozen', False):
         return sys.executable
     for binpath in (MLX_WHISPER_BIN, WHISPER_BIN):
@@ -398,7 +415,7 @@ def _pip_python() -> str:
                                 'python.exe' if sys.platform == 'win32' else 'python')
             if os.path.exists(cand):
                 return cand
-    return shutil.which('python3') or shutil.which('python') or sys.executable
+    return _real_python_on_path() or sys.executable
 
 def _active_engine(model: str):
     """このモデルで使うエンジンを決める。戻り値: ('mlx', bin) か ('openai', bin)。
@@ -691,8 +708,9 @@ class SetupWorker(QThread):
 
             if self.do_whisper:
                 # Windows で Python が無ければ winget でインストール
+                # （shutil.whichだけでは不可: Store誘導用の偽python.exeをつかむため _real_python_on_path で実行確認）
                 if sys.platform == 'win32':
-                    py = shutil.which('python') or shutil.which('python3')
+                    py = _real_python_on_path()
                     if not py:
                         winget = shutil.which('winget')
                         if winget:
@@ -704,8 +722,15 @@ class SetupWorker(QThread):
                             for line in proc.stdout:
                                 self.log_line.emit(line.rstrip())
                             proc.wait()
-                            # インストール後に再探索
-                            py = shutil.which('python') or shutil.which('python3')
+                            # インストール後に再探索（実行中プロセスのPATHは更新されないため
+                            # wingetの標準インストール先も直接見る）
+                            py = _real_python_on_path()
+                            if not py:
+                                local_app = os.environ.get('LOCALAPPDATA', '')
+                                if local_app:
+                                    hits = sorted(Path(local_app).glob('Programs/Python/Python3*/python.exe'))
+                                    if hits:
+                                        py = str(hits[-1])
                         if not py:
                             self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
                             self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
