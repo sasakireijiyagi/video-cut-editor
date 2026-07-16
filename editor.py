@@ -687,6 +687,28 @@ class SetupWorker(QThread):
                     self.log_line.emit('https://ffmpeg.org/download.html')
 
             if self.do_whisper:
+                # Windows で Python が無ければ winget でインストール
+                if sys.platform == 'win32':
+                    py = shutil.which('python') or shutil.which('python3')
+                    if not py:
+                        winget = shutil.which('winget')
+                        if winget:
+                            self.log_line.emit('Pythonをインストール中（winget）...')
+                            proc = subprocess.Popen(
+                                ['winget', 'install', '--id', 'Python.Python.3', '-e', '--silent'],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                encoding='utf-8', errors='replace')
+                            for line in proc.stdout:
+                                self.log_line.emit(line.rstrip())
+                            proc.wait()
+                            # インストール後に再探索
+                            py = shutil.which('python') or shutil.which('python3')
+                        if not py:
+                            self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
+                            self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
+                            self.finished.emit(False)
+                            return
+
                 # Apple Silicon は Metal GPU 対応の mlx-whisper、それ以外は openai-whisper
                 pkg = 'mlx-whisper' if _IS_APPLE_SILICON else 'openai-whisper'
                 py  = _pip_python()
