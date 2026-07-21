@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.13"
+APP_VERSION = "1.1.14"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -695,8 +695,13 @@ class SetupWorker(QThread):
                 winget = shutil.which('winget')
                 if winget:
                     self.log_line.emit('ffmpegをインストール中（winget）...')
+                    # --accept-*: 初回のwingetは規約同意を対話プロンプトで求め、
+                    # stdinが無いと 0x8a150042 で失敗するため事前同意フラグ必須
                     proc = subprocess.Popen(
-                        ['winget', 'install', '--id', 'Gyan.FFmpeg', '-e', '--silent'],
+                        ['winget', 'install', '--id', 'Gyan.FFmpeg', '-e', '--silent',
+                         '--accept-source-agreements', '--accept-package-agreements',
+                         '--disable-interactivity'],
+                        stdin=subprocess.DEVNULL,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         encoding='utf-8', errors='replace')
                     for line in proc.stdout:
@@ -716,7 +721,10 @@ class SetupWorker(QThread):
                         if winget:
                             self.log_line.emit('Pythonをインストール中（winget）...')
                             proc = subprocess.Popen(
-                                ['winget', 'install', '--id', 'Python.Python.3', '-e', '--silent'],
+                                ['winget', 'install', '--id', 'Python.Python.3', '-e', '--silent',
+                                 '--accept-source-agreements', '--accept-package-agreements',
+                                 '--disable-interactivity'],
+                                stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 encoding='utf-8', errors='replace')
                             for line in proc.stdout:
