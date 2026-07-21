@@ -3476,13 +3476,13 @@ class MainWindow(QMainWindow):
         self.cmb_lang.setMaximumWidth(90)
         self.btn_transcribe_cancel.setMaximumWidth(60)
 
-        # プライマリボタン: 「次に押すべきボタン」を常に1つだけ強調する
+        # プライマリボタン: 「次に押すべきボタン」を常に1つだけ強調する（ブランド赤）
         self.btn_transcribe.setStyleSheet(
-            'QPushButton { background: #1976d2; color: white; border: none;'
+            'QPushButton { background: #e63946; color: white; border: none;'
             ' border-radius: 6px; padding: 7px 18px; font-weight: bold; }'
-            ' QPushButton:hover { background: #1565c0; }'
-            ' QPushButton:pressed { background: #0d47a1; }'
-            ' QPushButton:disabled { background: #b9c6d0; color: #eef2f5; }')
+            ' QPushButton:hover { background: #d62839; }'
+            ' QPushButton:pressed { background: #b02631; }'
+            ' QPushButton:disabled { background: #d9c2c4; color: #f7eeee; }')
 
         # 詳細オプションはポップオーバーに格納（一度設定したら滅多に触らないため）
         self.btn_advanced = QToolButton()
@@ -3536,9 +3536,9 @@ class MainWindow(QMainWindow):
         # 空状態: 動画未読み込み時はドロップゾーンを表示（クリックでファイル選択も可）
         self.drop_zone = QPushButton(tr('drop_hint'))
         self.drop_zone.setStyleSheet(
-            'QPushButton { border: 2px dashed #b0b0b0; border-radius: 14px;'
+            'QPushButton { border: 2px dashed #c5c5c5; border-radius: 14px;'
             ' color: #909090; font-size: 15px; background: transparent; }'
-            ' QPushButton:hover { border-color: #1976d2; color: #1976d2; }')
+            ' QPushButton:hover { border-color: #e63946; color: #e63946; background: #fdf6f6; }')
         self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.drop_zone.clicked.connect(self._open_video)
 
@@ -4576,6 +4576,74 @@ class SplashScreen(QWidget):
 
 
 # ──────────────────────────────────────────────────────────────────
+# アプリ全体テーマ（ランディングページと同じ配色: 白ベース＋赤アクセント）
+# ──────────────────────────────────────────────────────────────────
+
+_ACCENT = '#e63946'          # ブランドの赤（ランディングページと共通）
+_ACCENT_HOVER = '#d62839'
+_ACCENT_PRESSED = '#b02631'
+
+APP_QSS = f"""
+QMainWindow, QDialog {{ background: #f7f7f5; }}
+QWidget {{ color: #1a1a1a; font-size: 13px; }}
+QLabel {{ background: transparent; }}
+QPushButton {{
+    background: #ffffff; color: #1a1a1a;
+    border: 1px solid #dddddd; border-radius: 6px; padding: 5px 12px;
+}}
+QPushButton:hover {{ background: #f2f2f2; border-color: #c5c5c5; }}
+QPushButton:pressed {{ background: #e8e8e8; }}
+QPushButton:disabled {{ color: #b0b0b0; background: #f5f5f5; border-color: #e8e8e8; }}
+QPushButton:flat {{ border: none; background: transparent; }}
+QToolButton {{
+    background: #ffffff; border: 1px solid #dddddd; border-radius: 6px; padding: 5px 12px;
+}}
+QToolButton:hover {{ background: #f2f2f2; border-color: #c5c5c5; }}
+QComboBox, QDoubleSpinBox, QSpinBox, QLineEdit {{
+    background: #ffffff; border: 1px solid #dddddd; border-radius: 6px; padding: 3px 8px;
+}}
+QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:focus {{ border-color: #b5b5b5; }}
+QComboBox QAbstractItemView {{
+    background: #ffffff; border: 1px solid #dddddd;
+    selection-background-color: #fdecea; selection-color: #1a1a1a;
+}}
+QCheckBox, QRadioButton {{ background: transparent; spacing: 6px; }}
+QTableWidget {{
+    background: #ffffff; alternate-background-color: #fafafa;
+    gridline-color: #efefef; border: 1px solid #e5e5e5; border-radius: 8px;
+    selection-background-color: #fdecea; selection-color: #1a1a1a;
+}}
+QHeaderView::section {{
+    background: #f2f2f2; color: #666666; border: none;
+    border-bottom: 1px solid #dddddd; padding: 4px 6px; font-weight: bold;
+}}
+QTextEdit, QListWidget {{
+    background: #ffffff; border: 1px solid #e5e5e5; border-radius: 8px;
+}}
+QGroupBox {{
+    border: 1px solid #e0e0e0; border-radius: 8px; margin-top: 10px; background: transparent;
+}}
+QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #666666; }}
+QProgressBar {{
+    background: #ececec; border: none; border-radius: 5px;
+    text-align: center; color: #666666; min-height: 12px;
+}}
+QProgressBar::chunk {{ background: {_ACCENT}; border-radius: 5px; }}
+QSlider::groove:horizontal {{ height: 4px; background: #dddddd; border-radius: 2px; }}
+QSlider::sub-page:horizontal {{ background: {_ACCENT}; border-radius: 2px; }}
+QSlider::handle:horizontal {{
+    width: 14px; height: 14px; margin: -5px 0;
+    background: {_ACCENT}; border-radius: 7px;
+}}
+QMenu {{ background: #ffffff; border: 1px solid #dddddd; border-radius: 8px; padding: 4px; }}
+QMenu::item {{ padding: 5px 18px; border-radius: 4px; background: transparent; }}
+QMenu::item:selected {{ background: #fdecea; }}
+QSplitter::handle {{ background: #e8e8e8; }}
+QToolTip {{ background: #1a1a1a; color: #ffffff; border: none; padding: 4px 8px; }}
+"""
+
+
+# ──────────────────────────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────────────────────────
 
@@ -4587,6 +4655,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("おまかせ文字起こし")
+    app.setStyleSheet(APP_QSS)
 
     # Klee One フォントを読み込む
     font_path = str(Path(__file__).parent / 'fonts' / 'HinaMincho-Regular.ttf')
