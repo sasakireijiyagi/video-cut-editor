@@ -3702,7 +3702,7 @@ class MainWindow(QMainWindow):
 
         self.log = QTextEdit()
         self.log.setReadOnly(True)
-        self.log.setMaximumHeight(150)
+        self.log.setMaximumHeight(90)
         vbox.addWidget(self.log)
 
     # ── 言語切り替え ──────────────────────────────────
