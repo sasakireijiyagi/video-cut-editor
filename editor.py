@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.14"
+APP_VERSION = "1.1.15"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -226,6 +226,27 @@ def _ms_to_srt(ms: int) -> str:
     mi, r = divmod(r, 60_000)
     s, ms = divmod(r, 1_000)
     return f"{h:02d}:{mi:02d}:{s:02d},{ms:03d}"
+
+
+def _ms_to_clock(ms: int) -> str:
+    """TXT書き出し用の HH:MM:SS 表記（ミリ秒なし）。"""
+    h, r = divmod(ms, 3_600_000)
+    mi, r = divmod(r, 60_000)
+    s = r // 1_000
+    return f"{h:02d}:{mi:02d}:{s:02d}"
+
+
+def _write_txt_from_srt(srt_path) -> str:
+    """SRTと同内容を時間つきTXTで併記出力する（議事録用途・AI入力用）。
+    形式: [HH:MM:SS - HH:MM:SS] テキスト（1エントリ1行）。戻り値は出力パス。"""
+    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
+    lines = []
+    for e in entries:
+        text = ' '.join(e.text.splitlines())
+        lines.append(f"[{_ms_to_clock(e.start_ms)} - {_ms_to_clock(e.end_ms)}] {text}")
+    txt_path = Path(srt_path).with_suffix('.txt')
+    txt_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    return str(txt_path)
 
 
 def _ms_to_ffmpeg(ms: int) -> str:
@@ -1484,7 +1505,8 @@ class BatchWhisperWorker(QThread):
 
     def __init__(self, files: List[str], model: str, language: str,
                  mark_silence: bool, silence_sec: float,
-                 fill_gaps: bool = False, fill_mode: str = 'label'):
+                 fill_gaps: bool = False, fill_mode: str = 'label',
+                 export_txt: bool = False):
         super().__init__()
         self.files        = files
         self.model        = model
@@ -1493,6 +1515,7 @@ class BatchWhisperWorker(QThread):
         self.silence_ms   = int(silence_sec * 1000)
         self.fill_gaps    = fill_gaps
         self.fill_mode    = fill_mode
+        self.export_txt   = export_txt
         self._stop        = False
         self._proc        = None
 
@@ -1646,6 +1669,14 @@ class BatchWhisperWorker(QThread):
                         lines.append('')
                     srt.write_text('\n'.join(lines), encoding='utf-8')
 
+            # TXT併記書き出し（[間]挿入・敷き詰め適用後の最終状態を出力）
+            if self.export_txt:
+                try:
+                    txt_path = _write_txt_from_srt(srt)
+                    self.log.emit(f"  TXT: {Path(txt_path).name}")
+                except Exception as exc:
+                    self.log.emit(f"  {'TXT export failed' if _lang == 'en' else 'TXT書き出し失敗'}: {exc}")
+
             success += 1
             self.file_done.emit(i + 1, total, True, str(srt))
             i += 1
@@ -1748,6 +1779,11 @@ class BatchDialog(QDialog):
         self.chk_fill_gaps.toggled.connect(self.cmb_fill_mode.setEnabled)
         cfg.addWidget(self.chk_fill_gaps)
         cfg.addWidget(self.cmb_fill_mode)
+        cfg.addSpacing(12)
+        self.chk_txt = QCheckBox('TXTでも書き出す' if _lang == 'ja' else 'Also export TXT')
+        self.chk_txt.setToolTip('SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です' if _lang == 'ja'
+                                else 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools')
+        cfg.addWidget(self.chk_txt)
         cfg.addStretch()
         vbox.addLayout(cfg)
 
@@ -1856,7 +1892,8 @@ class BatchDialog(QDialog):
             self.chk_silence.isChecked(),
             self.spn_silence.value(),
             fill_gaps=self.chk_fill_gaps.isChecked(),
-            fill_mode=fill_mode)
+            fill_mode=fill_mode,
+            export_txt=self.chk_txt.isChecked())
         self._worker.file_started.connect(self._on_file_started)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.seg_tick.connect(self._on_seg_tick)
