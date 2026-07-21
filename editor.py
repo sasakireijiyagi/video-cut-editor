@@ -944,22 +944,33 @@ FILLER_LISTS = {
     ],
 }
 
-_LANG_MAP = {
-    '日本語': 'ja',
-    'English': 'en',
-    '中文': 'zh',
-    '한국어': 'ko',
-    'Español': 'es',
-    'Français': 'fr',
-    'Deutsch': 'de',
-    'Português': 'pt',
-    'Italiano': 'it',
-    'Русский': 'ru',
-    'العربية': 'ar',
-    'Hindi हिन्दी': 'hi',
-    'Bahasa Indonesia': 'id',
-    '自動検出 / Auto': 'auto',
+# 文字起こし対象言語（表示名はUI言語に合わせる）
+_LANG_CODES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ar', 'hi', 'id', 'auto']
+_LANG_NAMES = {
+    'ja': {'ja': '日本語', 'en': '英語', 'zh': '中国語', 'ko': '韓国語',
+           'es': 'スペイン語', 'fr': 'フランス語', 'de': 'ドイツ語',
+           'pt': 'ポルトガル語', 'it': 'イタリア語', 'ru': 'ロシア語',
+           'ar': 'アラビア語', 'hi': 'ヒンディー語', 'id': 'インドネシア語',
+           'auto': '自動検出'},
+    'en': {'ja': 'Japanese', 'en': 'English', 'zh': 'Chinese', 'ko': 'Korean',
+           'es': 'Spanish', 'fr': 'French', 'de': 'German',
+           'pt': 'Portuguese', 'it': 'Italian', 'ru': 'Russian',
+           'ar': 'Arabic', 'hi': 'Hindi', 'id': 'Indonesian',
+           'auto': 'Auto detect'},
 }
+
+def _lang_display_names() -> list:
+    """現在のUI言語での言語表示名リスト（コンボボックス用・_LANG_CODES順）。"""
+    names = _LANG_NAMES['ja' if _lang == 'ja' else 'en']
+    return [names[c] for c in _LANG_CODES]
+
+def _lang_code_of(display_name: str) -> str:
+    """表示名→whisper言語コード。日英どちらの表示名でも引ける。既定は 'ja'。"""
+    for names in _LANG_NAMES.values():
+        for code, name in names.items():
+            if name == display_name:
+                return code
+    return 'ja'
 
 
 class VersionCheckWorker(QThread):
@@ -1858,7 +1869,7 @@ class BatchDialog(QDialog):
         cfg.addSpacing(12)
         cfg.addWidget(QLabel('言語:' if _lang == 'ja' else 'Language:'))
         self.cmb_lang = QComboBox()
-        self.cmb_lang.addItems(list(_LANG_MAP.keys()))
+        self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setCurrentText(self._default_language)
         cfg.addWidget(self.cmb_lang)
         cfg.addSpacing(12)
@@ -1995,7 +2006,7 @@ class BatchDialog(QDialog):
             return
 
         model = self.cmb_model.currentText().lstrip('★ ').split(' ')[0]
-        lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
+        lang  = _lang_code_of(self.cmb_lang.currentText())
 
         fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
         self._worker = BatchWhisperWorker(
@@ -3007,7 +3018,7 @@ class SRTTable(QWidget):
         win = self.window()
         lang_code = 'ja'
         if hasattr(win, 'cmb_lang'):
-            lang_code = _LANG_MAP.get(win.cmb_lang.currentText(), 'ja')
+            lang_code = _lang_code_of(win.cmb_lang.currentText())
         dlg = FillerCutDialog(self, win, transcribe_lang=lang_code)
         dlg.exec()
 
@@ -3445,7 +3456,7 @@ class MainWindow(QMainWindow):
         self._populate_models()
 
         self.cmb_lang = QComboBox()
-        self.cmb_lang.addItems(list(_LANG_MAP.keys()))
+        self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setToolTip(tr('lang_tip'))
 
         self.btn_transcribe = QPushButton(tr('transcribe_btn'))
@@ -3752,6 +3763,14 @@ class MainWindow(QMainWindow):
         self.lbl_lang.setText(tr('lang_label'))
         self.cmb_model.setToolTip(tr('model_tip'))
         self.cmb_lang.setToolTip(tr('lang_tip'))
+        # 言語リストの表示名をUI言語に合わせて再構築（選択はコードで保持）
+        cur_code = _lang_code_of(self.cmb_lang.currentText())
+        self.cmb_lang.blockSignals(True)
+        self.cmb_lang.clear()
+        self.cmb_lang.addItems(_lang_display_names())
+        names = _LANG_NAMES['ja' if _lang == 'ja' else 'en']
+        self.cmb_lang.setCurrentText(names[cur_code])
+        self.cmb_lang.blockSignals(False)
         self.btn_transcribe.setText(tr('transcribe_btn'))
         self.btn_transcribe_cancel.setText(tr('transcribe_cancel'))
         self.btn_batch.setText('📂 複数ファイルを指定' if _lang == 'ja' else '📂 Multiple Files…')
@@ -4227,7 +4246,7 @@ class MainWindow(QMainWindow):
                 'Whisper is not installed.\nRun Setup from the Help menu.')
             return
         model = self.cmb_model.currentText().lstrip('★ ').split(' ')[0]
-        lang  = _LANG_MAP.get(self.cmb_lang.currentText(), 'ja')
+        lang  = _lang_code_of(self.cmb_lang.currentText())
 
         fill_mode = 'label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank'
         self.whisper_worker = WhisperWorker(
