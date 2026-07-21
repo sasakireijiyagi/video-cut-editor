@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.18"
+APP_VERSION = "1.1.19"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -429,9 +429,10 @@ def _real_python_on_path() -> str:
     return ''
 
 def _pip_python() -> str:
-    """`pip install` を実行する Python を返す。ソース実行なら sys.executable。
-    凍結アプリ(PyInstaller)では sys.executable はアプリ本体でpipが無いため、
-    既存whisper/mlxと同じ環境のpython（アプリが探す場所と一致）→ PATH上の本物 の順で探す。"""
+    """`pip install` を実行する Python を返す。見つからなければ ''。
+    ソース実行なら sys.executable。凍結アプリ(PyInstaller)では sys.executable は
+    アプリ本体なので**絶対に返さない**（返すと `アプリ.exe -m pip` で自分自身を
+    再起動し、セットアップダイアログが増殖する無限ループになる）。"""
     if not getattr(sys, 'frozen', False):
         return sys.executable
     for binpath in (MLX_WHISPER_BIN, WHISPER_BIN):
@@ -440,7 +441,17 @@ def _pip_python() -> str:
                                 'python.exe' if sys.platform == 'win32' else 'python')
             if os.path.exists(cand):
                 return cand
-    return _real_python_on_path() or sys.executable
+    p = _real_python_on_path()
+    if p:
+        return p
+    if sys.platform == 'win32':
+        # PATH未反映でもwingetの標準インストール先にあれば使う
+        local_app = os.environ.get('LOCALAPPDATA', '')
+        if local_app:
+            hits = sorted(Path(local_app).glob('Programs/Python/Python3*/python.exe'))
+            if hits:
+                return str(hits[-1])
+    return ''
 
 def _active_engine(model: str):
     """このモデルで使うエンジンを決める。戻り値: ('mlx', bin) か ('openai', bin)。
@@ -772,7 +783,13 @@ class SetupWorker(QThread):
 
                 # Apple Silicon は Metal GPU 対応の mlx-whisper、それ以外は openai-whisper
                 pkg = 'mlx-whisper' if _IS_APPLE_SILICON else 'openai-whisper'
-                py  = _pip_python()
+                if sys.platform != 'win32':
+                    py = _pip_python()   # win32は上のブロックで解決済みのpyを使う（上書きしない）
+                if not py:
+                    self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
+                    self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
+                    self.finished.emit(False)
+                    return
                 self.log_line.emit(f'Whisper（{pkg}）をインストール中...')
                 self.log_line.emit(f'  （うまくいかない場合は手動で: pip install {pkg}）')
                 proc = subprocess.Popen(
@@ -4426,6 +4443,11 @@ class SplashScreen(QWidget):
 # ──────────────────────────────────────────────────────────────────
 
 def main():
+    # 自己増殖ガード: 凍結アプリが誤って python として呼ばれた場合
+    # （例: EasyTranscribe.exe -m pip ...）は何もせず終了する
+    if len(sys.argv) >= 2 and sys.argv[1] == '-m':
+        sys.exit(2)
+
     app = QApplication(sys.argv)
     app.setApplicationName("おまかせ文字起こし")
 
