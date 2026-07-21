@@ -3391,6 +3391,8 @@ class MainWindow(QMainWindow):
         self._build_menu()
         QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
             self.srt_tbl._open_find_replace)
+        QShortcut(QKeySequence('Ctrl+F'), self).activated.connect(
+            self.srt_tbl._open_find_replace)   # Macでは Cmd+F
         QShortcut(QKeySequence('Ctrl+S'), self).activated.connect(self._save_srt)
 
     def _build(self):
