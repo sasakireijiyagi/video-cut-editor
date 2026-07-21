@@ -3386,6 +3386,8 @@ class MainWindow(QMainWindow):
         self.whisper_worker: Optional[WhisperWorker] = None
         self.setWindowTitle(tr('window_title'))
         self.setMinimumSize(1100, 700)
+        # 起動時はやや大きめに（SRT表の表示行数を確保。画面が小さければOSが収めてくれる）
+        self.resize(1240, 900)
         self.setAcceptDrops(True)   # 動画/音声/SRTのドラッグ&ドロップを受け付ける
         self._build()
         self._build_menu()
