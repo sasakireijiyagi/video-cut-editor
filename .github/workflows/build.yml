@@ -28,6 +28,7 @@ jobs:
             --icon AppIcon.icns \
             --onedir \
             --collect-all PyQt6 \
+            --add-data "fonts:fonts" \
             editor.py
 
       - name: Install create-dmg
@@ -75,6 +76,7 @@ jobs:
             --icon AppIcon.ico `
             --onedir `
             --collect-all PyQt6 `
+            --add-data "fonts;fonts" `
             editor.py
 
       - name: Zip

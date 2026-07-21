@@ -4584,62 +4584,63 @@ _ACCENT_HOVER = '#d62839'
 _ACCENT_PRESSED = '#b02631'
 
 APP_QSS = f"""
-QMainWindow, QDialog {{ background: #f7f7f5; }}
+QMainWindow, QDialog {{ background: #ffffff; }}
 QWidget {{ color: #1a1a1a; font-size: 13px; }}
 QLabel {{ background: transparent; }}
 QPushButton {{
     background: #ffffff; color: #1a1a1a;
-    border: 1px solid #dddddd; border-radius: 6px; padding: 5px 12px;
+    border: 1px solid #e4e4e4; border-radius: 6px; padding: 5px 12px;
 }}
-QPushButton:hover {{ background: #f2f2f2; border-color: #c5c5c5; }}
-QPushButton:pressed {{ background: #e8e8e8; }}
-QPushButton:disabled {{ color: #b0b0b0; background: #f5f5f5; border-color: #e8e8e8; }}
+QPushButton:hover {{ background: #f7f7f7; border-color: #cfcfcf; }}
+QPushButton:pressed {{ background: #efefef; }}
+QPushButton:disabled {{ color: #bcbcbc; background: #fafafa; border-color: #efefef; }}
 QPushButton:flat {{ border: none; background: transparent; }}
 QToolButton {{
-    background: #ffffff; border: 1px solid #dddddd; border-radius: 6px; padding: 5px 12px;
+    background: #ffffff; border: 1px solid #e4e4e4; border-radius: 6px; padding: 5px 12px;
 }}
-QToolButton:hover {{ background: #f2f2f2; border-color: #c5c5c5; }}
+QToolButton:hover {{ background: #f7f7f7; border-color: #cfcfcf; }}
 QComboBox, QDoubleSpinBox, QSpinBox, QLineEdit {{
-    background: #ffffff; border: 1px solid #dddddd; border-radius: 6px; padding: 3px 8px;
+    background: #ffffff; border: 1px solid #e4e4e4; border-radius: 6px; padding: 3px 8px;
 }}
-QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:focus {{ border-color: #b5b5b5; }}
+QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:focus {{ border-color: #bdbdbd; }}
 QComboBox::drop-down {{ border: none; background: transparent; width: 22px; }}
 QComboBox QAbstractItemView {{
-    background: #ffffff; border: 1px solid #dddddd;
+    background: #ffffff; border: 1px solid #e4e4e4;
     selection-background-color: #fdecea; selection-color: #1a1a1a;
 }}
 QCheckBox, QRadioButton {{ background: transparent; spacing: 6px; }}
 QTableWidget {{
-    background: #ffffff; alternate-background-color: #fafafa;
-    gridline-color: #efefef; border: 1px solid #e5e5e5; border-radius: 8px;
+    background: #ffffff; alternate-background-color: #fbfbfb;
+    gridline-color: #f2f2f2; border: 1px solid #ececec; border-radius: 8px;
     selection-background-color: #fdecea; selection-color: #1a1a1a;
 }}
 QHeaderView::section {{
-    background: #f2f2f2; color: #666666; border: none;
-    border-bottom: 1px solid #dddddd; padding: 4px 6px; font-weight: bold;
+    background: #fafafa; color: #999999; border: none;
+    border-bottom: 1px solid #ececec; padding: 5px 6px;
+    font-weight: bold; letter-spacing: 1px;
 }}
 QTextEdit, QListWidget {{
-    background: #ffffff; border: 1px solid #e5e5e5; border-radius: 8px;
+    background: #ffffff; border: 1px solid #ececec; border-radius: 8px;
 }}
 QGroupBox {{
-    border: 1px solid #e0e0e0; border-radius: 8px; margin-top: 10px; background: transparent;
+    border: 1px solid #ececec; border-radius: 8px; margin-top: 10px; background: transparent;
 }}
-QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #666666; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #999999; }}
 QProgressBar {{
-    background: #ececec; border: none; border-radius: 5px;
+    background: #f2f2f2; border: none; border-radius: 5px;
     text-align: center; color: #666666; min-height: 12px;
 }}
 QProgressBar::chunk {{ background: {_ACCENT}; border-radius: 5px; }}
-QSlider::groove:horizontal {{ height: 4px; background: #dddddd; border-radius: 2px; }}
+QSlider::groove:horizontal {{ height: 4px; background: #e8e8e8; border-radius: 2px; }}
 QSlider::sub-page:horizontal {{ background: {_ACCENT}; border-radius: 2px; }}
 QSlider::handle:horizontal {{
     width: 14px; height: 14px; margin: -5px 0;
     background: {_ACCENT}; border-radius: 7px;
 }}
-QMenu {{ background: #ffffff; border: 1px solid #dddddd; border-radius: 8px; padding: 4px; }}
+QMenu {{ background: #ffffff; border: 1px solid #e4e4e4; border-radius: 8px; padding: 4px; }}
 QMenu::item {{ padding: 5px 18px; border-radius: 4px; background: transparent; }}
 QMenu::item:selected {{ background: #fdecea; }}
-QSplitter::handle {{ background: #e8e8e8; }}
+QSplitter::handle {{ background: #f0f0f0; }}
 QToolTip {{ background: #1a1a1a; color: #ffffff; border: none; padding: 4px 8px; }}
 """
 
@@ -4658,8 +4659,15 @@ def main():
     app.setApplicationName("おまかせ文字起こし")
     app.setStyleSheet(APP_QSS)
 
+    # UIフォント: ランディングページと同じ Zen Kaku Gothic New（同梱・OFL）
+    fonts_dir = Path(__file__).parent / 'fonts'
+    for f in ('ZenKakuGothicNew-Regular.ttf', 'ZenKakuGothicNew-Bold.ttf'):
+        QFontDatabase.addApplicationFont(str(fonts_dir / f))
+    if 'Zen Kaku Gothic New' in QFontDatabase.families():
+        app.setFont(QFont('Zen Kaku Gothic New', 13))
+
     # Klee One フォントを読み込む
-    font_path = str(Path(__file__).parent / 'fonts' / 'HinaMincho-Regular.ttf')
+    font_path = str(fonts_dir / 'HinaMincho-Regular.ttf')
     font_id = QFontDatabase.addApplicationFont(font_path)
 
     # スプラッシュ画面
