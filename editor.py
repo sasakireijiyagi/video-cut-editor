@@ -1792,7 +1792,23 @@ class BatchDialog(QDialog):
         self._default_fill_mode = fill_mode
         self._default_export_txt = export_txt
         self._default_export_csv = export_csv
+        self.setAcceptDrops(True)   # 動画/音声のドラッグ&ドロップでリストに追加
         self._build()
+
+    _MEDIA_EXTS = ('.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm',
+                   '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg')
+
+    def dragEnterEvent(self, event):
+        md = event.mimeData()
+        if md.hasUrls() and any(u.toLocalFile().lower().endswith(self._MEDIA_EXTS)
+                                for u in md.urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        paths = [u.toLocalFile() for u in event.mimeData().urls()
+                 if u.toLocalFile().lower().endswith(self._MEDIA_EXTS)]
+        if paths:
+            self._append_paths(paths)
 
     def _build(self):
         vbox = QVBoxLayout(self)
@@ -3678,7 +3694,7 @@ class MainWindow(QMainWindow):
 
     # ── 言語切り替え ──────────────────────────────────
 
-    def _open_batch(self):
+    def _open_batch(self, checked=False, files=None):
         dlg = BatchDialog(
             self,
             model=self.cmb_model.currentText().lstrip('★ ').split(' ')[0],
@@ -3690,6 +3706,8 @@ class MainWindow(QMainWindow):
             export_txt=self.chk_export_txt.isChecked(),
             export_csv=self.chk_export_csv.isChecked(),
         )
+        if files:
+            dlg._append_paths(files)
         dlg.exec()
 
     def _open_donate(self):
@@ -3822,14 +3840,19 @@ class MainWindow(QMainWindow):
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        media = []
         for u in event.mimeData().urls():
             path = u.toLocalFile()
             low = path.lower()
             if low.endswith('.srt'):
                 self._load_srt(path)
             elif low.endswith(self._MEDIA_EXTS):
-                self._open_media_path(path)
-                break   # 動画は最初の1本だけ（複数はバッチへ誘導）
+                media.append(path)
+        if len(media) == 1:
+            self._open_media_path(media[0])
+        elif len(media) > 1:
+            # 複数ファイルはバッチ文字起こしへ（リストに投入した状態で開く）
+            self._open_batch(files=media)
 
     def _materialize_then_open(self, path: str):
         from PyQt6.QtWidgets import QProgressDialog
