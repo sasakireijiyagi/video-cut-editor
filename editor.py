@@ -67,6 +67,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QTextEdit, QHeaderView, QAbstractItemView,
     QSlider, QSizePolicy, QMessageBox, QComboBox, QDoubleSpinBox, QSpinBox,
     QDialog, QDialogButtonBox, QMenuBar, QMenu,
+    QToolButton, QWidgetAction, QStackedWidget,
 )
 from PyQt6.QtCore import Qt, QUrl, pyqtSignal, QThread, QTimer, QPropertyAnimation, QEasingCurve
 from PyQt6.QtGui import QKeySequence, QShortcut, QFont, QFontDatabase, QPainter, QColor
@@ -111,6 +112,9 @@ STRINGS = {
         'export_txt_tip'    : 'SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
         'export_csv'        : 'CSV出力',
         'export_csv_tip'    : 'SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です',
+        'advanced'          : '⚙ 詳細',
+        'advanced_tip'      : '[間]の記録・しきつめ・TXT出力などの詳細オプション',
+        'drop_hint'         : '🎬\n\n動画・音声をここにドロップ\nまたはクリックしてファイルを選択',
         'output_group'      : '出力設定',
         'combine'           : '1ファイルに結合',
         'separate'          : '行ごとに別ファイル',
@@ -177,6 +181,9 @@ STRINGS = {
         'export_txt_tip'    : 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools',
         'export_csv'        : 'CSV',
         'export_csv_tip'    : 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel',
+        'advanced'          : '⚙ Options',
+        'advanced_tip'      : 'Advanced options: [Pause] recording, gap filling, TXT export',
+        'drop_hint'         : '🎬\n\nDrop a video or audio file here\nor click to choose a file',
         'output_group'      : 'Output Settings',
         'combine'           : 'Combine into one file',
         'separate'          : 'Separate file per segment',
@@ -3352,6 +3359,7 @@ class MainWindow(QMainWindow):
         self.whisper_worker: Optional[WhisperWorker] = None
         self.setWindowTitle(tr('window_title'))
         self.setMinimumSize(1100, 700)
+        self.setAcceptDrops(True)   # 動画/音声/SRTのドラッグ&ドロップを受け付ける
         self._build()
         self._build_menu()
         QShortcut(QKeySequence('Ctrl+H'), self).activated.connect(
@@ -3464,34 +3472,59 @@ class MainWindow(QMainWindow):
         self.lbl_lang  = QLabel(tr('lang_label'))
 
         # ボタン・コンボのサイズ調整
-        self.cmb_model.setMaximumWidth(130)
+        self.cmb_model.setMaximumWidth(150)
         self.cmb_lang.setMaximumWidth(90)
-        self.btn_transcribe.setMaximumWidth(130)
-        self.btn_transcribe_cancel.setMaximumWidth(50)
-        self.btn_batch.setMaximumWidth(150)
-        self.spn_silence.setFixedWidth(78)
-        self.cmb_fill_mode.setFixedWidth(72)
+        self.btn_transcribe_cancel.setMaximumWidth(60)
 
-        w_bar.setSpacing(4)
+        # プライマリボタン: 「次に押すべきボタン」を常に1つだけ強調する
+        self.btn_transcribe.setStyleSheet(
+            'QPushButton { background: #1976d2; color: white; border: none;'
+            ' border-radius: 6px; padding: 7px 18px; font-weight: bold; }'
+            ' QPushButton:hover { background: #1565c0; }'
+            ' QPushButton:pressed { background: #0d47a1; }'
+            ' QPushButton:disabled { background: #b9c6d0; color: #eef2f5; }')
+
+        # 詳細オプションはポップオーバーに格納（一度設定したら滅多に触らないため）
+        self.btn_advanced = QToolButton()
+        self.btn_advanced.setText(tr('advanced'))
+        self.btn_advanced.setToolTip(tr('advanced_tip'))
+        self.btn_advanced.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.btn_advanced.setStyleSheet('QToolButton::menu-indicator { image: none; }')
+        adv_menu = QMenu(self.btn_advanced)
+        adv_panel = QWidget()
+        adv_v = QVBoxLayout(adv_panel)
+        adv_v.setContentsMargins(14, 10, 14, 10)
+        adv_v.setSpacing(8)
+        adv_r1 = QHBoxLayout()
+        adv_r1.addWidget(self.chk_mark_silence)
+        adv_r1.addWidget(self.spn_silence)
+        adv_r1.addStretch()
+        adv_r2 = QHBoxLayout()
+        adv_r2.addWidget(self.chk_fill_gaps)
+        adv_r2.addWidget(self.cmb_fill_mode)
+        adv_r2.addStretch()
+        adv_v.addLayout(adv_r1)
+        adv_v.addLayout(adv_r2)
+        adv_v.addWidget(self.chk_export_txt)
+        adv_v.addWidget(self.chk_export_csv)
+        adv_act = QWidgetAction(adv_menu)
+        adv_act.setDefaultWidget(adv_panel)
+        adv_menu.addAction(adv_act)
+        self.btn_advanced.setMenu(adv_menu)
+
+        w_bar.setSpacing(6)
         w_bar.addWidget(self.lbl_model)
         w_bar.addWidget(self.cmb_model)
         w_bar.addSpacing(4)
         w_bar.addWidget(self.lbl_lang)
         w_bar.addWidget(self.cmb_lang)
-        w_bar.addSpacing(4)
+        w_bar.addSpacing(10)
         w_bar.addWidget(self.btn_transcribe)
         w_bar.addWidget(self.btn_transcribe_cancel)
         w_bar.addSpacing(8)
         w_bar.addWidget(self.btn_batch)
-        w_bar.addSpacing(12)
-        w_bar.addWidget(self.chk_mark_silence)
-        w_bar.addWidget(self.spn_silence)
-        w_bar.addSpacing(8)
-        w_bar.addWidget(self.chk_fill_gaps)
-        w_bar.addWidget(self.cmb_fill_mode)
-        w_bar.addSpacing(8)
-        w_bar.addWidget(self.chk_export_txt)
-        w_bar.addWidget(self.chk_export_csv)
+        w_bar.addSpacing(10)
+        w_bar.addWidget(self.btn_advanced)
         w_bar.addStretch()
         vbox.addLayout(w_bar)
 
@@ -3499,7 +3532,21 @@ class MainWindow(QMainWindow):
         self.spl = QSplitter(Qt.Orientation.Horizontal)
 
         self.player = VideoPlayer()
-        self.spl.addWidget(self.player)
+
+        # 空状態: 動画未読み込み時はドロップゾーンを表示（クリックでファイル選択も可）
+        self.drop_zone = QPushButton(tr('drop_hint'))
+        self.drop_zone.setStyleSheet(
+            'QPushButton { border: 2px dashed #b0b0b0; border-radius: 14px;'
+            ' color: #909090; font-size: 15px; background: transparent; }'
+            ' QPushButton:hover { border-color: #1976d2; color: #1976d2; }')
+        self.drop_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.drop_zone.clicked.connect(self._open_video)
+
+        self.player_stack = QStackedWidget()
+        self.player_stack.addWidget(self.drop_zone)   # index 0: 空状態
+        self.player_stack.addWidget(self.player)      # index 1: プレイヤー
+        self.player_stack.setCurrentIndex(0)
+        self.spl.addWidget(self.player_stack)
 
         self.srt_tbl = SRTTable()
         self.srt_tbl.row_activated.connect(self._on_row)
@@ -3704,6 +3751,9 @@ class MainWindow(QMainWindow):
         self.chk_export_txt.setToolTip(tr('export_txt_tip'))
         self.chk_export_csv.setText(tr('export_csv'))
         self.chk_export_csv.setToolTip(tr('export_csv_tip'))
+        self.btn_advanced.setText(tr('advanced'))
+        self.btn_advanced.setToolTip(tr('advanced_tip'))
+        self.drop_zone.setText(tr('drop_hint'))
         self.grp_output.setTitle(tr('output_group'))
         self.rb_combine.setText(tr('combine'))
         self.rb_separate.setText(tr('separate'))
@@ -3745,6 +3795,9 @@ class MainWindow(QMainWindow):
         except Exception:
             return 0, 0
 
+    _MEDIA_EXTS = ('.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm',
+                   '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg')
+
     def _open_video(self):
         path, _ = QFileDialog.getOpenFileName(
             self, tr('dlg_open_video'),
@@ -3752,11 +3805,31 @@ class MainWindow(QMainWindow):
             tr('dlg_video_filter'))
         if not path:
             return
+        self._open_media_path(path)
+
+    def _open_media_path(self, path: str):
         # Dropbox等のオンラインのみファイルは、進捗を見せながら実体化してから読み込む
         if _is_dataless(path):
             self._materialize_then_open(path)
         else:
             self._finish_open_video(path)
+
+    def dragEnterEvent(self, event):
+        md = event.mimeData()
+        if md.hasUrls() and any(
+                u.toLocalFile().lower().endswith(self._MEDIA_EXTS + ('.srt',))
+                for u in md.urls()):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        for u in event.mimeData().urls():
+            path = u.toLocalFile()
+            low = path.lower()
+            if low.endswith('.srt'):
+                self._load_srt(path)
+            elif low.endswith(self._MEDIA_EXTS):
+                self._open_media_path(path)
+                break   # 動画は最初の1本だけ（複数はバッチへ誘導）
 
     def _materialize_then_open(self, path: str):
         from PyQt6.QtWidgets import QProgressDialog
@@ -3795,6 +3868,7 @@ class MainWindow(QMainWindow):
         self.btn_export_srt.setEnabled(False)
         # 出力先フォルダも動画と同じ場所に（毎回 Downloads に戻さない）
         self.txt_dir.setText(str(Path(path).parent))
+        self.player_stack.setCurrentIndex(1)   # ドロップゾーン → プレイヤー表示
         self.player.load(path)
         self.btn_transcribe.setEnabled(True)
         self.btn_close_video.setEnabled(True)
@@ -4022,6 +4096,7 @@ class MainWindow(QMainWindow):
         self.srt_path   = None
         self.player.player.stop()
         self.player.load('')
+        self.player_stack.setCurrentIndex(0)   # 空状態のドロップゾーンに戻す
         self.srt_tbl.load([])
         self.lbl_video.setText(tr('video_none'))
         self.lbl_srt.setText(tr('srt_none'))
