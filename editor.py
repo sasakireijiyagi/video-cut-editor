@@ -3482,7 +3482,7 @@ class MainWindow(QMainWindow):
             ' border-radius: 6px; padding: 7px 18px; font-weight: bold; }'
             ' QPushButton:hover { background: #d62839; }'
             ' QPushButton:pressed { background: #b02631; }'
-            ' QPushButton:disabled { background: #d9c2c4; color: #f7eeee; }')
+            ' QPushButton:disabled { background: #e2e2e0; color: #a8a8a6; }')
 
         # 詳細オプションはポップオーバーに格納（一度設定したら滅多に触らないため）
         self.btn_advanced = QToolButton()
@@ -4603,6 +4603,7 @@ QComboBox, QDoubleSpinBox, QSpinBox, QLineEdit {{
     background: #ffffff; border: 1px solid #dddddd; border-radius: 6px; padding: 3px 8px;
 }}
 QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:focus {{ border-color: #b5b5b5; }}
+QComboBox::drop-down {{ border: none; background: transparent; width: 22px; }}
 QComboBox QAbstractItemView {{
     background: #ffffff; border: 1px solid #dddddd;
     selection-background-color: #fdecea; selection-color: #1a1a1a;
