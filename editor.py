@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.15"
+APP_VERSION = "1.1.16"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -95,6 +95,8 @@ STRINGS = {
         'fill_gaps_tip'     : '発話間のすべての隙間にエントリを挿入する（会話分析向け）',
         'fill_mode_label'   : '[間]表示',
         'fill_mode_blank'   : '空欄',
+        'export_txt'        : 'TXT出力',
+        'export_txt_tip'    : 'SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
         'output_group'      : '出力設定',
         'combine'           : '1ファイルに結合',
         'separate'          : '行ごとに別ファイル',
@@ -157,6 +159,8 @@ STRINGS = {
         'fill_gaps_tip'     : 'Insert an entry for every gap between utterances (for conversation analysis)',
         'fill_mode_label'   : '[Pause] label',
         'fill_mode_blank'   : 'Blank',
+        'export_txt'        : 'TXT',
+        'export_txt_tip'    : 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools',
         'output_group'      : 'Output Settings',
         'combine'           : 'Combine into one file',
         'separate'          : 'Separate file per segment',
@@ -1341,7 +1345,8 @@ class WhisperWorker(QThread):
 
     def __init__(self, video: str, model: str, language: str,
                  mark_silence: bool = False, silence_sec: float = 1.0,
-                 fill_gaps: bool = False, fill_mode: str = 'label'):
+                 fill_gaps: bool = False, fill_mode: str = 'label',
+                 export_txt: bool = False):
         super().__init__()
         self.video        = video
         self.model        = model
@@ -1350,6 +1355,7 @@ class WhisperWorker(QThread):
         self.silence_ms   = int(silence_sec * 1000)
         self.fill_gaps    = fill_gaps
         self.fill_mode    = fill_mode
+        self.export_txt   = export_txt
         self._proc        = None
 
     def cancel(self):
@@ -1483,6 +1489,14 @@ class WhisperWorker(QThread):
                 inserted = len(new_entries) - len(entries)
                 mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
                 self.log.emit(f"  {'Gaps filled' if _lang=='en' else 'しきつめ完了'} ({mode_str}): +{inserted}")
+
+        # TXT併記書き出し（[間]挿入・しきつめ適用後の最終状態を出力）
+        if self.export_txt:
+            try:
+                txt_path = _write_txt_from_srt(srt)
+                self.log.emit(f"  TXT: {Path(txt_path).name}")
+            except Exception as exc:
+                self.log.emit(f"  {'TXT export failed' if _lang == 'en' else 'TXT書き出し失敗'}: {exc}")
 
         self.done.emit(True, str(srt))
 
@@ -1692,7 +1706,8 @@ class BatchDialog(QDialog):
     def __init__(self, parent=None, model: str = 'large-v3',
                  language: str = '日本語',
                  mark_silence: bool = False, silence_sec: float = 1.0,
-                 fill_gaps: bool = False, fill_mode: str = 'label'):
+                 fill_gaps: bool = False, fill_mode: str = 'label',
+                 export_txt: bool = False):
         super().__init__(parent)
         self.setWindowTitle('バッチ文字起こし' if _lang == 'ja' else 'Batch Transcription')
         self.setMinimumSize(700, 500)
@@ -1703,6 +1718,7 @@ class BatchDialog(QDialog):
         self._default_silence_sec = silence_sec
         self._default_fill_gaps = fill_gaps
         self._default_fill_mode = fill_mode
+        self._default_export_txt = export_txt
         self._build()
 
     def _build(self):
@@ -1783,6 +1799,7 @@ class BatchDialog(QDialog):
         self.chk_txt = QCheckBox('TXTでも書き出す' if _lang == 'ja' else 'Also export TXT')
         self.chk_txt.setToolTip('SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です' if _lang == 'ja'
                                 else 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools')
+        self.chk_txt.setChecked(self._default_export_txt)
         cfg.addWidget(self.chk_txt)
         cfg.addStretch()
         vbox.addLayout(cfg)
@@ -3365,6 +3382,9 @@ class MainWindow(QMainWindow):
         self.cmb_fill_mode.setEnabled(False)
         self.chk_fill_gaps.toggled.connect(self.cmb_fill_mode.setEnabled)
 
+        self.chk_export_txt = QCheckBox(tr('export_txt'))
+        self.chk_export_txt.setToolTip(tr('export_txt_tip'))
+
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
 
@@ -3394,6 +3414,8 @@ class MainWindow(QMainWindow):
         w_bar.addSpacing(8)
         w_bar.addWidget(self.chk_fill_gaps)
         w_bar.addWidget(self.cmb_fill_mode)
+        w_bar.addSpacing(8)
+        w_bar.addWidget(self.chk_export_txt)
         w_bar.addStretch()
         vbox.addLayout(w_bar)
 
@@ -3542,6 +3564,7 @@ class MainWindow(QMainWindow):
             silence_sec=self.spn_silence.value(),
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode='label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank',
+            export_txt=self.chk_export_txt.isChecked(),
         )
         dlg.exec()
 
@@ -3600,6 +3623,8 @@ class MainWindow(QMainWindow):
         self.cmb_fill_mode.clear()
         self.cmb_fill_mode.addItems([tr('fill_mode_label'), tr('fill_mode_blank')])
         self.cmb_fill_mode.setCurrentIndex(cur_idx)
+        self.chk_export_txt.setText(tr('export_txt'))
+        self.chk_export_txt.setToolTip(tr('export_txt_tip'))
         self.grp_output.setTitle(tr('output_group'))
         self.rb_combine.setText(tr('combine'))
         self.rb_separate.setText(tr('separate'))
@@ -4034,6 +4059,7 @@ class MainWindow(QMainWindow):
             silence_sec=self.spn_silence.value(),
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode=fill_mode,
+            export_txt=self.chk_export_txt.isChecked(),
         )
         self.whisper_worker.log.connect(self.log.append)
         self.whisper_worker.done.connect(self._on_transcription_done)
