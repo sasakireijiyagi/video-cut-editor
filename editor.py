@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.17"
+APP_VERSION = "1.1.18"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -900,6 +900,7 @@ _LANG_MAP = {
     'Русский': 'ru',
     'العربية': 'ar',
     'Hindi हिन्दी': 'hi',
+    'Bahasa Indonesia': 'id',
     '自動検出 / Auto': 'auto',
 }
 
