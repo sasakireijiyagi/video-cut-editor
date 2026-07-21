@@ -1781,7 +1781,7 @@ class BatchDialog(QDialog):
                  fill_gaps: bool = False, fill_mode: str = 'label',
                  export_txt: bool = False, export_csv: bool = False):
         super().__init__(parent)
-        self.setWindowTitle('バッチ文字起こし' if _lang == 'ja' else 'Batch Transcription')
+        self.setWindowTitle('複数ファイルの文字起こし' if _lang == 'ja' else 'Transcribe Multiple Files')
         self.setMinimumSize(700, 500)
         self._worker: Optional[BatchWhisperWorker] = None
         self._default_model    = model
@@ -3456,7 +3456,7 @@ class MainWindow(QMainWindow):
         self.btn_transcribe_cancel.setEnabled(False)
         self.btn_transcribe_cancel.clicked.connect(self._cancel_transcribe)
 
-        self.btn_batch = QPushButton('📂 バッチ文字起こし' if _lang == 'ja' else '📂 Batch Transcription')
+        self.btn_batch = QPushButton('📂 複数ファイルを指定' if _lang == 'ja' else '📂 Multiple Files…')
         self.btn_batch.setToolTip('複数の動画ファイルをまとめて文字起こしする' if _lang == 'ja'
                                   else 'Transcribe multiple video files at once')
         self.btn_batch.clicked.connect(self._open_batch)
@@ -3754,7 +3754,7 @@ class MainWindow(QMainWindow):
         self.cmb_lang.setToolTip(tr('lang_tip'))
         self.btn_transcribe.setText(tr('transcribe_btn'))
         self.btn_transcribe_cancel.setText(tr('transcribe_cancel'))
-        self.btn_batch.setText('📂 バッチ文字起こし' if _lang == 'ja' else '📂 Batch Transcription')
+        self.btn_batch.setText('📂 複数ファイルを指定' if _lang == 'ja' else '📂 Multiple Files…')
         self.chk_mark_silence.setText(tr('mark_silence'))
         self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
         self.spn_silence.setSuffix(tr('silence_suffix'))
