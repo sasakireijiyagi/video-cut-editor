@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.16"
+APP_VERSION = "1.1.17"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -746,7 +746,7 @@ class SetupWorker(QThread):
                         if winget:
                             self.log_line.emit('Pythonをインストール中（winget）...')
                             proc = subprocess.Popen(
-                                ['winget', 'install', '--id', 'Python.Python.3', '-e', '--silent',
+                                ['winget', 'install', '--id', 'Python.Python.3.12', '-e', '--silent',
                                  '--accept-source-agreements', '--accept-package-agreements',
                                  '--disable-interactivity'],
                                 stdin=subprocess.DEVNULL,
