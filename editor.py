@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.19"
+APP_VERSION = "1.1.20"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -43,6 +43,18 @@ if _p:
 
 import re
 import subprocess
+
+if sys.platform == 'win32':
+    # 配布版（--windowedビルド）では子プロセス（whisper/ffmpeg/pip等）ごとに
+    # 黒いコンソール窓が開いてしまい、ユーザーがその窓を閉じると処理も
+    # 強制終了される（exit code 3221225786 = 0xC000013A）。
+    # 全subprocess呼び出しで一括して窓を抑止する（subprocess.runも内部でPopenを使う）。
+    _orig_popen_init = subprocess.Popen.__init__
+    def _no_window_popen_init(self, *args, **kwargs):
+        kwargs['creationflags'] = kwargs.get('creationflags', 0) | subprocess.CREATE_NO_WINDOW
+        _orig_popen_init(self, *args, **kwargs)
+    subprocess.Popen.__init__ = _no_window_popen_init
+
 from pathlib import Path
 from dataclasses import dataclass
 from typing import List, Optional
