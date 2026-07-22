@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.1.20"
+APP_VERSION = "1.1.21"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -109,6 +109,8 @@ STRINGS = {
         'fill_mode_blank'   : '空欄',
         'export_txt'        : 'TXT出力',
         'export_txt_tip'    : 'SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
+        'export_csv'        : 'CSV出力',
+        'export_csv_tip'    : 'SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です',
         'output_group'      : '出力設定',
         'combine'           : '1ファイルに結合',
         'separate'          : '行ごとに別ファイル',
@@ -173,6 +175,8 @@ STRINGS = {
         'fill_mode_blank'   : 'Blank',
         'export_txt'        : 'TXT',
         'export_txt_tip'    : 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools',
+        'export_csv'        : 'CSV',
+        'export_csv_tip'    : 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel',
         'output_group'      : 'Output Settings',
         'combine'           : 'Combine into one file',
         'separate'          : 'Separate file per segment',
@@ -263,6 +267,23 @@ def _write_txt_from_srt(srt_path) -> str:
     txt_path = Path(srt_path).with_suffix('.txt')
     txt_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return str(txt_path)
+
+
+def _write_csv_from_srt(srt_path) -> str:
+    """SRTと同内容をExcelで開ける表形式（開始/終了/テキスト列）のCSVで書き出す。
+    質的分析でのコーディング用途を想定し、末尾に空の「メモ」列を1つ添える。
+    Excelでの文字化け防止のためBOM付きUTF-8（utf-8-sig）で書く。"""
+    import csv
+    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
+    csv_path = Path(srt_path).with_suffix('.csv')
+    with csv_path.open('w', encoding='utf-8-sig', newline='') as f:
+        w = csv.writer(f)
+        header = ['開始', '終了', 'テキスト', 'メモ'] if _lang == 'ja' else ['Start', 'End', 'Text', 'Notes']
+        w.writerow(header)
+        for e in entries:
+            text = ' '.join(e.text.splitlines())
+            w.writerow([_ms_to_clock(e.start_ms), _ms_to_clock(e.end_ms), text, ''])
+    return str(csv_path)
 
 
 def _ms_to_ffmpeg(ms: int) -> str:
@@ -1376,7 +1397,7 @@ class WhisperWorker(QThread):
     def __init__(self, video: str, model: str, language: str,
                  mark_silence: bool = False, silence_sec: float = 1.0,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False):
+                 export_txt: bool = False, export_csv: bool = False):
         super().__init__()
         self.video        = video
         self.model        = model
@@ -1386,6 +1407,7 @@ class WhisperWorker(QThread):
         self.fill_gaps    = fill_gaps
         self.fill_mode    = fill_mode
         self.export_txt   = export_txt
+        self.export_csv   = export_csv
         self._proc        = None
 
     def cancel(self):
@@ -1520,13 +1542,19 @@ class WhisperWorker(QThread):
                 mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
                 self.log.emit(f"  {'Gaps filled' if _lang=='en' else 'しきつめ完了'} ({mode_str}): +{inserted}")
 
-        # TXT併記書き出し（[間]挿入・しきつめ適用後の最終状態を出力）
+        # TXT/CSV併記書き出し（[間]挿入・しきつめ適用後の最終状態を出力）
         if self.export_txt:
             try:
                 txt_path = _write_txt_from_srt(srt)
                 self.log.emit(f"  TXT: {Path(txt_path).name}")
             except Exception as exc:
                 self.log.emit(f"  {'TXT export failed' if _lang == 'en' else 'TXT書き出し失敗'}: {exc}")
+        if self.export_csv:
+            try:
+                csv_path = _write_csv_from_srt(srt)
+                self.log.emit(f"  CSV: {Path(csv_path).name}")
+            except Exception as exc:
+                self.log.emit(f"  {'CSV export failed' if _lang == 'en' else 'CSV書き出し失敗'}: {exc}")
 
         self.done.emit(True, str(srt))
 
@@ -1550,7 +1578,7 @@ class BatchWhisperWorker(QThread):
     def __init__(self, files: List[str], model: str, language: str,
                  mark_silence: bool, silence_sec: float,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False):
+                 export_txt: bool = False, export_csv: bool = False):
         super().__init__()
         self.files        = files
         self.model        = model
@@ -1560,6 +1588,7 @@ class BatchWhisperWorker(QThread):
         self.fill_gaps    = fill_gaps
         self.fill_mode    = fill_mode
         self.export_txt   = export_txt
+        self.export_csv   = export_csv
         self._stop        = False
         self._proc        = None
 
@@ -1713,13 +1742,19 @@ class BatchWhisperWorker(QThread):
                         lines.append('')
                     srt.write_text('\n'.join(lines), encoding='utf-8')
 
-            # TXT併記書き出し（[間]挿入・敷き詰め適用後の最終状態を出力）
+            # TXT/CSV併記書き出し（[間]挿入・敷き詰め適用後の最終状態を出力）
             if self.export_txt:
                 try:
                     txt_path = _write_txt_from_srt(srt)
                     self.log.emit(f"  TXT: {Path(txt_path).name}")
                 except Exception as exc:
                     self.log.emit(f"  {'TXT export failed' if _lang == 'en' else 'TXT書き出し失敗'}: {exc}")
+            if self.export_csv:
+                try:
+                    csv_path = _write_csv_from_srt(srt)
+                    self.log.emit(f"  CSV: {Path(csv_path).name}")
+                except Exception as exc:
+                    self.log.emit(f"  {'CSV export failed' if _lang == 'en' else 'CSV書き出し失敗'}: {exc}")
 
             success += 1
             self.file_done.emit(i + 1, total, True, str(srt))
@@ -1737,7 +1772,7 @@ class BatchDialog(QDialog):
                  language: str = '日本語',
                  mark_silence: bool = False, silence_sec: float = 1.0,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False):
+                 export_txt: bool = False, export_csv: bool = False):
         super().__init__(parent)
         self.setWindowTitle('バッチ文字起こし' if _lang == 'ja' else 'Batch Transcription')
         self.setMinimumSize(700, 500)
@@ -1749,6 +1784,7 @@ class BatchDialog(QDialog):
         self._default_fill_gaps = fill_gaps
         self._default_fill_mode = fill_mode
         self._default_export_txt = export_txt
+        self._default_export_csv = export_csv
         self._build()
 
     def _build(self):
@@ -1831,6 +1867,11 @@ class BatchDialog(QDialog):
                                 else 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools')
         self.chk_txt.setChecked(self._default_export_txt)
         cfg.addWidget(self.chk_txt)
+        self.chk_csv = QCheckBox('CSVでも書き出す' if _lang == 'ja' else 'Also export CSV')
+        self.chk_csv.setToolTip('SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です' if _lang == 'ja'
+                                else 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel')
+        self.chk_csv.setChecked(self._default_export_csv)
+        cfg.addWidget(self.chk_csv)
         cfg.addStretch()
         vbox.addLayout(cfg)
 
@@ -1940,7 +1981,8 @@ class BatchDialog(QDialog):
             self.spn_silence.value(),
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode=fill_mode,
-            export_txt=self.chk_txt.isChecked())
+            export_txt=self.chk_txt.isChecked(),
+            export_csv=self.chk_csv.isChecked())
         self._worker.file_started.connect(self._on_file_started)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.seg_tick.connect(self._on_seg_tick)
@@ -3415,6 +3457,9 @@ class MainWindow(QMainWindow):
         self.chk_export_txt = QCheckBox(tr('export_txt'))
         self.chk_export_txt.setToolTip(tr('export_txt_tip'))
 
+        self.chk_export_csv = QCheckBox(tr('export_csv'))
+        self.chk_export_csv.setToolTip(tr('export_csv_tip'))
+
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
 
@@ -3446,6 +3491,7 @@ class MainWindow(QMainWindow):
         w_bar.addWidget(self.cmb_fill_mode)
         w_bar.addSpacing(8)
         w_bar.addWidget(self.chk_export_txt)
+        w_bar.addWidget(self.chk_export_csv)
         w_bar.addStretch()
         vbox.addLayout(w_bar)
 
@@ -3595,6 +3641,7 @@ class MainWindow(QMainWindow):
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode='label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank',
             export_txt=self.chk_export_txt.isChecked(),
+            export_csv=self.chk_export_csv.isChecked(),
         )
         dlg.exec()
 
@@ -3655,6 +3702,8 @@ class MainWindow(QMainWindow):
         self.cmb_fill_mode.setCurrentIndex(cur_idx)
         self.chk_export_txt.setText(tr('export_txt'))
         self.chk_export_txt.setToolTip(tr('export_txt_tip'))
+        self.chk_export_csv.setText(tr('export_csv'))
+        self.chk_export_csv.setToolTip(tr('export_csv_tip'))
         self.grp_output.setTitle(tr('output_group'))
         self.rb_combine.setText(tr('combine'))
         self.rb_separate.setText(tr('separate'))
@@ -4090,6 +4139,7 @@ class MainWindow(QMainWindow):
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode=fill_mode,
             export_txt=self.chk_export_txt.isChecked(),
+            export_csv=self.chk_export_csv.isChecked(),
         )
         self.whisper_worker.log.connect(self.log.append)
         self.whisper_worker.done.connect(self._on_transcription_done)
