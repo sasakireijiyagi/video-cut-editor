@@ -8,7 +8,7 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -1493,34 +1493,9 @@ class WhisperWorker(QThread):
             self.done.emit(False, f"SRT not found: {srt}")
             return
 
-        if self.mark_silence:
-            entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
-            new_entries = []
-            for i, entry in enumerate(entries):
-                new_entries.append(entry)
-                if i + 1 < len(entries):
-                    gap_ms = entries[i + 1].start_ms - entry.end_ms
-                    if gap_ms >= self.silence_ms:
-                        label = f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
-                        new_entries.append(SRTEntry(
-                            index=0,
-                            start_ms=entry.end_ms,
-                            end_ms=entries[i + 1].start_ms,
-                            text=label,
-                        ))
-            for idx, e in enumerate(new_entries):
-                e.index = idx + 1
-            lines = []
-            for e in new_entries:
-                lines.append(str(e.index))
-                lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
-                lines.append(e.text)
-                lines.append('')
-            srt.write_text('\n'.join(lines), encoding='utf-8')
-            inserted = len(new_entries) - len(entries)
-            self.log.emit(f"  {'[Pause] inserted' if _lang=='en' else '[間] を挿入'}: {inserted} ({self.silence_ms/1000:.1f}{'s' if _lang=='en' else '秒'}+)")
-
-        elif self.fill_gaps:
+        # しきつめ（全区間を漏れなく記録）はしきい値付きの[間]記録の上位互換なので、
+        # 両方ONの場合はしきつめを優先する（[間]を記録だけが有効な場合は従来通り）
+        if self.fill_gaps:
             entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
             if entries:
                 dur_ms = int(_media_duration(self.video) * 1000)
@@ -1559,6 +1534,33 @@ class WhisperWorker(QThread):
                 inserted = len(new_entries) - len(entries)
                 mode_str = ('Blank' if _lang == 'en' else '空欄') if self.fill_mode == 'blank' else ('[Pause]' if _lang == 'en' else '[間]')
                 self.log.emit(f"  {'Gaps filled' if _lang=='en' else 'しきつめ完了'} ({mode_str}): +{inserted}")
+
+        elif self.mark_silence:
+            entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
+            new_entries = []
+            for i, entry in enumerate(entries):
+                new_entries.append(entry)
+                if i + 1 < len(entries):
+                    gap_ms = entries[i + 1].start_ms - entry.end_ms
+                    if gap_ms >= self.silence_ms:
+                        label = f'[Pause  {gap_ms/1000:.1f}s]' if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]'
+                        new_entries.append(SRTEntry(
+                            index=0,
+                            start_ms=entry.end_ms,
+                            end_ms=entries[i + 1].start_ms,
+                            text=label,
+                        ))
+            for idx, e in enumerate(new_entries):
+                e.index = idx + 1
+            lines = []
+            for e in new_entries:
+                lines.append(str(e.index))
+                lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                lines.append(e.text)
+                lines.append('')
+            srt.write_text('\n'.join(lines), encoding='utf-8')
+            inserted = len(new_entries) - len(entries)
+            self.log.emit(f"  {'[Pause] inserted' if _lang=='en' else '[間] を挿入'}: {inserted} ({self.silence_ms/1000:.1f}{'s' if _lang=='en' else '秒'}+)")
 
         # TXT/CSV併記書き出し（[間]挿入・しきつめ適用後の最終状態を出力）
         if self.export_txt:
@@ -1703,30 +1705,9 @@ class BatchWhisperWorker(QThread):
                 i += 1
                 continue
 
-            # [間] 挿入
-            if self.mark_silence:
-                entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
-                new_entries = []
-                for j, entry in enumerate(entries):
-                    new_entries.append(entry)
-                    if j + 1 < len(entries):
-                        gap_ms = entries[j + 1].start_ms - entry.end_ms
-                        if gap_ms >= self.silence_ms:
-                            label = (f'[Pause  {gap_ms/1000:.1f}s]'
-                                     if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]')
-                            new_entries.append(SRTEntry(0, entry.end_ms,
-                                entries[j + 1].start_ms, label))
-                for idx, e in enumerate(new_entries):
-                    e.index = idx + 1
-                lines = []
-                for e in new_entries:
-                    lines.append(str(e.index))
-                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
-                    lines.append(e.text)
-                    lines.append('')
-                srt.write_text('\n'.join(lines), encoding='utf-8')
-
-            elif self.fill_gaps:
+            # しきつめ（全区間漏れなく記録）は閾値付き[間]記録の上位互換なので、
+            # 両方ONの場合はしきつめを優先する（[間]を記録だけが有効な場合は従来通り）
+            if self.fill_gaps:
                 entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
                 if entries:
                     dur_ms = int(_media_duration(video) * 1000)
@@ -1759,6 +1740,28 @@ class BatchWhisperWorker(QThread):
                         lines.append(e.text)
                         lines.append('')
                     srt.write_text('\n'.join(lines), encoding='utf-8')
+
+            elif self.mark_silence:
+                entries = parse_srt(srt.read_text(encoding='utf-8-sig'))
+                new_entries = []
+                for j, entry in enumerate(entries):
+                    new_entries.append(entry)
+                    if j + 1 < len(entries):
+                        gap_ms = entries[j + 1].start_ms - entry.end_ms
+                        if gap_ms >= self.silence_ms:
+                            label = (f'[Pause  {gap_ms/1000:.1f}s]'
+                                     if _lang == 'en' else f'[間  {gap_ms/1000:.1f}秒]')
+                            new_entries.append(SRTEntry(0, entry.end_ms,
+                                entries[j + 1].start_ms, label))
+                for idx, e in enumerate(new_entries):
+                    e.index = idx + 1
+                lines = []
+                for e in new_entries:
+                    lines.append(str(e.index))
+                    lines.append(f"{_ms_to_srt(e.start_ms)} --> {_ms_to_srt(e.end_ms)}")
+                    lines.append(e.text)
+                    lines.append('')
+                srt.write_text('\n'.join(lines), encoding='utf-8')
 
             # TXT/CSV併記書き出し（[間]挿入・敷き詰め適用後の最終状態を出力）
             if self.export_txt:
@@ -3502,6 +3505,21 @@ class MainWindow(QMainWindow):
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
 
+        # 初期設定プリセット: 用途に応じて[間]/しきつめ/字幕焼き込みを一括設定
+        self.lbl_preset = QLabel('初期設定:' if _lang == 'ja' else 'Preset:')
+        self.btn_preset_research = QPushButton('🔬 研究用' if _lang == 'ja' else '🔬 Research')
+        self.btn_preset_research.setToolTip(
+            '会話分析・質的研究向け: しきつめ・[間]の記録をON、字幕焼き込みをOFFにします'
+            if _lang == 'ja' else
+            'For conversation/qualitative analysis: turns on gap-filling and [Pause] recording, turns off subtitle burn-in')
+        self.btn_preset_research.clicked.connect(self._apply_preset_research)
+        self.btn_preset_video = QPushButton('🎬 動画用' if _lang == 'ja' else '🎬 Video')
+        self.btn_preset_video.setToolTip(
+            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF、字幕焼き込みをONにします'
+            if _lang == 'ja' else
+            'For video content production: turns off gap-filling and [Pause] recording, turns on subtitle burn-in')
+        self.btn_preset_video.clicked.connect(self._apply_preset_video)
+
         # ボタン・コンボのサイズ調整
         self.cmb_model.setMaximumWidth(150)
         self.cmb_lang.setMaximumWidth(90)
@@ -3544,6 +3562,10 @@ class MainWindow(QMainWindow):
         self.btn_advanced.setMenu(adv_menu)
 
         w_bar.setSpacing(6)
+        w_bar.addWidget(self.lbl_preset)
+        w_bar.addWidget(self.btn_preset_research)
+        w_bar.addWidget(self.btn_preset_video)
+        w_bar.addSpacing(10)
         w_bar.addWidget(self.lbl_model)
         w_bar.addWidget(self.cmb_model)
         w_bar.addSpacing(4)
@@ -3707,6 +3729,23 @@ class MainWindow(QMainWindow):
         self.log.setMaximumHeight(90)
         vbox.addWidget(self.log)
 
+    # ── 初期設定プリセット ────────────────────────────
+
+    def _apply_preset_research(self):
+        self.chk_fill_gaps.setChecked(True)
+        self.cmb_fill_mode.setCurrentIndex(0)   # [間]表示
+        self.chk_mark_silence.setChecked(True)
+        self.chk_burn_sub.setChecked(False)
+        self.log.append('--- ' + ('研究用プリセットを適用しました' if _lang == 'ja'
+                                   else 'Applied research preset') + ' ---')
+
+    def _apply_preset_video(self):
+        self.chk_fill_gaps.setChecked(False)
+        self.chk_mark_silence.setChecked(False)
+        self.chk_burn_sub.setChecked(True)
+        self.log.append('--- ' + ('動画用プリセットを適用しました' if _lang == 'ja'
+                                   else 'Applied video preset') + ' ---')
+
     # ── 言語切り替え ──────────────────────────────────
 
     def _open_batch(self, checked=False, files=None):
@@ -3794,6 +3833,17 @@ class MainWindow(QMainWindow):
         self.chk_export_csv.setToolTip(tr('export_csv_tip'))
         self.btn_advanced.setText(tr('advanced'))
         self.btn_advanced.setToolTip(tr('advanced_tip'))
+        self.lbl_preset.setText('初期設定:' if _lang == 'ja' else 'Preset:')
+        self.btn_preset_research.setText('🔬 研究用' if _lang == 'ja' else '🔬 Research')
+        self.btn_preset_research.setToolTip(
+            '会話分析・質的研究向け: しきつめ・[間]の記録をON、字幕焼き込みをOFFにします'
+            if _lang == 'ja' else
+            'For conversation/qualitative analysis: turns on gap-filling and [Pause] recording, turns off subtitle burn-in')
+        self.btn_preset_video.setText('🎬 動画用' if _lang == 'ja' else '🎬 Video')
+        self.btn_preset_video.setToolTip(
+            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF、字幕焼き込みをONにします'
+            if _lang == 'ja' else
+            'For video content production: turns off gap-filling and [Pause] recording, turns on subtitle burn-in')
         self.drop_zone.setText(tr('drop_hint'))
         self.grp_output.setTitle(tr('output_group'))
         self.rb_combine.setText(tr('combine'))
