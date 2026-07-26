@@ -8,7 +8,12 @@ import os
 import shutil
 import platform
 
-APP_VERSION = "1.2.1"
+# Intel MacでMetalのシェーダーコンパイルが権限エラーでクラッシュする問題の回避策。
+# setdefaultなのでユーザーが既に環境変数を設定していればそちらが優先される。
+os.environ.setdefault('QT_QUICK_BACKEND', 'software')
+os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
+
+APP_VERSION = "1.2.2"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
