@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.3"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -268,26 +268,30 @@ def _ms_to_clock(ms: int) -> str:
     return f"{h:02d}:{mi:02d}:{s:02d}"
 
 
-def _write_txt_from_srt(srt_path) -> str:
-    """SRTと同内容を時間つきTXTで併記出力する（議事録用途・AI入力用）。
-    形式: [HH:MM:SS - HH:MM:SS] テキスト（1エントリ1行）。戻り値は出力パス。"""
-    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
+def _entries_to_txt_lines(entries) -> list:
+    """SRTエントリ一覧を時間つきTXT行のリストに変換する（1エントリ1行）。"""
     lines = []
     for e in entries:
         text = ' '.join(e.text.splitlines())
         lines.append(f"[{_ms_to_clock(e.start_ms)} - {_ms_to_clock(e.end_ms)}] {text}")
+    return lines
+
+
+def _write_txt_from_srt(srt_path) -> str:
+    """SRTと同内容を時間つきTXTで併記出力する（議事録用途・AI入力用）。
+    形式: [HH:MM:SS - HH:MM:SS] テキスト（1エントリ1行）。戻り値は出力パス。"""
+    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
     txt_path = Path(srt_path).with_suffix('.txt')
-    txt_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    txt_path.write_text('\n'.join(_entries_to_txt_lines(entries)) + '\n', encoding='utf-8')
     return str(txt_path)
 
 
-def _write_csv_from_srt(srt_path) -> str:
-    """SRTと同内容をExcelで開ける表形式（開始/終了/テキスト列）のCSVで書き出す。
+def _write_entries_as_csv(entries, csv_path) -> str:
+    """SRTエントリ一覧をExcelで開ける表形式（開始/終了/テキスト列）のCSVで書き出す。
     質的分析でのコーディング用途を想定し、末尾に空の「メモ」列を1つ添える。
     Excelでの文字化け防止のためBOM付きUTF-8（utf-8-sig）で書く。"""
     import csv
-    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
-    csv_path = Path(srt_path).with_suffix('.csv')
+    csv_path = Path(csv_path)
     with csv_path.open('w', encoding='utf-8-sig', newline='') as f:
         w = csv.writer(f)
         header = ['開始', '終了', 'テキスト', 'メモ'] if _lang == 'ja' else ['Start', 'End', 'Text', 'Notes']
@@ -296,6 +300,12 @@ def _write_csv_from_srt(srt_path) -> str:
             text = ' '.join(e.text.splitlines())
             w.writerow([_ms_to_clock(e.start_ms), _ms_to_clock(e.end_ms), text, ''])
     return str(csv_path)
+
+
+def _write_csv_from_srt(srt_path) -> str:
+    """SRTファイルを読み込んで同内容のCSVを書き出す（バッチ/シングル文字起こし後の併記書き出し用）。"""
+    entries = parse_srt(Path(srt_path).read_text(encoding='utf-8-sig'))
+    return _write_entries_as_csv(entries, Path(srt_path).with_suffix('.csv'))
 
 
 def _ms_to_ffmpeg(ms: int) -> str:
@@ -3428,6 +3438,16 @@ class MainWindow(QMainWindow):
         self.btn_export_srt.setToolTip('編集中のSRTを別ファイルに書き出す（元ファイルは上書きしない）'
                                        if _lang == 'ja' else 'Export the current SRT to a new file (does not overwrite)')
         self.btn_export_srt.clicked.connect(self._export_srt)
+        self.btn_export_txt = QPushButton('TXT書き出し' if _lang == 'ja' else 'Export TXT')
+        self.btn_export_txt.setEnabled(False)
+        self.btn_export_txt.setToolTip('編集中の内容を時間つきテキスト（.txt）で書き出す\n議事録作成やAIへの入力に便利です'
+                                       if _lang == 'ja' else 'Export the current content as timestamped text (.txt)\nHandy for meeting minutes or feeding into AI tools')
+        self.btn_export_txt.clicked.connect(self._export_txt)
+        self.btn_export_csv = QPushButton('CSV書き出し' if _lang == 'ja' else 'Export CSV')
+        self.btn_export_csv.setEnabled(False)
+        self.btn_export_csv.setToolTip('編集中の内容を開始・終了・テキスト列に分けたCSVで書き出す\nExcelでの分析・コーディング作業に便利です'
+                                       if _lang == 'ja' else 'Export the current content as CSV (start/end/text columns)\nHandy for coding and analysis in Excel')
+        self.btn_export_csv.clicked.connect(self._export_csv)
         self.btn_close_video = QPushButton('✕')
         self.btn_close_video.setFixedWidth(28)
         self.btn_close_video.setEnabled(False)
@@ -3449,7 +3469,8 @@ class MainWindow(QMainWindow):
         self.btn_donate.setToolTip(tr('donate_tip'))
         self.btn_donate.clicked.connect(self._open_donate)
 
-        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt, self.btn_export_srt, self.btn_export_eaf):
+        for w in (self.btn_video, self.lbl_video, self.btn_close_video, self.btn_srt, self.lbl_srt, self.btn_save_srt,
+                  self.btn_export_srt, self.btn_export_txt, self.btn_export_csv, self.btn_export_eaf):
             bar.addWidget(w)
         bar.addStretch()
         bar.addWidget(self.btn_lang)
@@ -3967,6 +3988,8 @@ class MainWindow(QMainWindow):
         self.srt_tbl.load([])
         self.btn_save_srt.setEnabled(False)
         self.btn_export_srt.setEnabled(False)
+        self.btn_export_txt.setEnabled(False)
+        self.btn_export_csv.setEnabled(False)
         # 出力先フォルダも動画と同じ場所に（毎回 Downloads に戻さない）
         self.txt_dir.setText(str(Path(path).parent))
         self.player_stack.setCurrentIndex(1)   # ドロップゾーン → プレイヤー表示
@@ -4015,6 +4038,8 @@ class MainWindow(QMainWindow):
         self.lbl_srt.setText(tr('srt_label').format(name=Path(path).name))
         self.btn_save_srt.setEnabled(True)
         self.btn_export_srt.setEnabled(True)
+        self.btn_export_txt.setEnabled(True)
+        self.btn_export_csv.setEnabled(True)
         self._follow_row = -1
         self.log.append(tr('log_srt_loaded').format(n=len(entries), path=path))
 
@@ -4073,6 +4098,54 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, tr('err_title'), f"Export failed:\n{exc}")
             return
         self.log.append((f'SRT書き出し完了: {path}') if _lang == 'ja' else f'SRT exported: {path}')
+
+    def _export_txt(self):
+        """編集中の内容を時間つきテキスト（.txt）で書き出す（議事録作成・AI入力用）。"""
+        entries = self.srt_tbl.entries
+        if not entries:
+            QMessageBox.warning(self, tr('err_title'),
+                'SRTが読み込まれていません' if _lang == 'ja' else 'No SRT loaded.')
+            return
+        base = self.video_path or self.srt_path
+        if base:
+            default = str(Path(base).with_name(Path(base).stem + '.txt'))
+        else:
+            default = str(Path.home() / 'transcript.txt')
+        path, _ = QFileDialog.getSaveFileName(
+            self, 'TXTを書き出し' if _lang == 'ja' else 'Export TXT',
+            default, 'テキスト (*.txt);;すべて (*)' if _lang == 'ja' else 'Text (*.txt);;All (*)')
+        if not path:
+            return
+        try:
+            Path(path).write_text('\n'.join(_entries_to_txt_lines(entries)) + '\n', encoding='utf-8')
+        except Exception as exc:
+            QMessageBox.critical(self, tr('err_title'), f"Export failed:\n{exc}")
+            return
+        self.log.append((f'TXT書き出し完了: {path}') if _lang == 'ja' else f'TXT exported: {path}')
+
+    def _export_csv(self):
+        """編集中の内容を開始・終了・テキスト列に分けたCSVで書き出す（Excelでの分析・コーディング用）。"""
+        entries = self.srt_tbl.entries
+        if not entries:
+            QMessageBox.warning(self, tr('err_title'),
+                'SRTが読み込まれていません' if _lang == 'ja' else 'No SRT loaded.')
+            return
+        base = self.video_path or self.srt_path
+        if base:
+            default = str(Path(base).with_name(Path(base).stem + '.csv'))
+        else:
+            default = str(Path.home() / 'transcript.csv')
+        path, _ = QFileDialog.getSaveFileName(
+            self, 'CSVを書き出し' if _lang == 'ja' else 'Export CSV',
+            default, 'CSV (*.csv);;すべて (*)' if _lang == 'ja' else 'CSV (*.csv);;All (*)')
+        if not path:
+            return
+        try:
+            _write_entries_as_csv(entries, path)
+        except Exception as exc:
+            QMessageBox.critical(self, tr('err_title'), f"Export failed:\n{exc}")
+            return
+        self.log.append((f'CSV書き出し完了: {path}') if _lang == 'ja' else f'CSV exported: {path}')
 
     def _on_row(self, row: int):
         if row < len(self.srt_tbl.entries):
@@ -4203,6 +4276,8 @@ class MainWindow(QMainWindow):
         self.lbl_srt.setText(tr('srt_none'))
         self.btn_save_srt.setEnabled(False)
         self.btn_export_srt.setEnabled(False)
+        self.btn_export_txt.setEnabled(False)
+        self.btn_export_csv.setEnabled(False)
         self.btn_export_eaf.setEnabled(False)
         self.btn_close_video.setEnabled(False)
         self.btn_transcribe.setEnabled(False)
