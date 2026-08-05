@@ -198,6 +198,19 @@
       text-align: center;
       margin-bottom: 2rem;
     }
+    .features-group {
+      margin-bottom: 2rem;
+    }
+    .features-group-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #e8e8e8;
+    }
     .features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -422,38 +435,49 @@
 
   <section class="features-section">
     <p class="section-label">Features</p>
-    <div class="features-grid">
-      <div class="feature">
-        <div class="feature-label">Transcription</div>
-        <h3>高精度な文字起こし</h3>
-        <p>OpenAI Whisper で 100 言語に対応。講義・会議・インタビュー動画を自動転写。</p>
-      </div>
-      <div class="feature">
-        <div class="feature-label">Editing</div>
-        <h3>かんたん編集・カット</h3>
-        <p>文字起こし結果から残したい部分だけ選んで、動画をカット出力。時間の微調整もかんたん。</p>
-      </div>
-      <div class="feature">
-        <div class="feature-label">Drag &amp; Drop</div>
-        <h3>ドラッグ&amp;ドロップで文字起こし</h3>
-        <p>動画・音声をウィンドウにドロップするだけで開ける。複数ファイルをまとめてドロップすれば一括文字起こしも自動で開始。</p>
-      </div>
-      <div class="feature">
-        <div class="feature-label">Filler Cut</div>
-        <h3>フィラーカット</h3>
-        <p>「えー」「あの」などを 8 言語のリストから自動除去。カスタマイズも可。</p>
-      </div>
-      <div class="feature">
-        <div class="feature-label">Subtitle</div>
-        <h3>字幕焼き込み</h3>
-        <p>太ゴシック・白文字・黒縁取りで映像に直接焼き込み。縦動画も自動対応。</p>
-      </div>
-      <div class="feature">
-        <div class="feature-label">Export</div>
-        <h3>EAF 書き出し</h3>
-        <p>言語学ツール ELAN 用の EAF ファイルとして書き出し。研究用途にも対応。</p>
+
+    <div class="features-group">
+      <p class="features-group-label">研究・分析用途</p>
+      <div class="features-grid">
+        <div class="feature">
+          <div class="feature-label">Transcription</div>
+          <h3>高精度な文字起こし</h3>
+          <p>OpenAI Whisper で 100 言語に対応。講義・会議・インタビュー動画を自動転写。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-label">Drag &amp; Drop</div>
+          <h3>ドラッグ&amp;ドロップで文字起こし</h3>
+          <p>動画・音声をウィンドウにドロップするだけで開ける。複数ファイルをまとめてドロップすれば一括文字起こしも自動で開始。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-label">Export</div>
+          <h3>EAF 書き出し</h3>
+          <p>会話分析・質的研究向けの注釈ツール ELAN 用の EAF ファイルとして書き出し。</p>
+        </div>
       </div>
     </div>
+
+    <div class="features-group">
+      <p class="features-group-label">動画制作用途</p>
+      <div class="features-grid">
+        <div class="feature">
+          <div class="feature-label">Editing</div>
+          <h3>かんたん編集・カット</h3>
+          <p>文字起こし結果から残したい部分だけ選んで、動画をカット出力。時間の微調整もかんたん。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-label">Filler Cut</div>
+          <h3>フィラーカット</h3>
+          <p>「えー」「あの」などを 8 言語のリストから自動除去。カスタマイズも可。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-label">Subtitle</div>
+          <h3>字幕焼き込み</h3>
+          <p>太ゴシック・白文字・黒縁取りで映像に直接焼き込み。縦動画も自動対応。</p>
+        </div>
+      </div>
+    </div>
+
   </section>
 
 
