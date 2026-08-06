@@ -15,12 +15,19 @@ jobs:
 
       - name: Fetch download count
         run: |
-          COUNT=$(curl -s https://api.github.com/repos/sasakireijiyagi/video-cut-editor/releases \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            | python3 -c "
-          import json, sys
-          releases = json.load(sys.stdin)
-          total = sum(a['download_count'] for r in releases for a in r.get('assets', []))
+          COUNT=$(python3 -c "
+          import urllib.request, json, sys
+          token = '${{ secrets.GITHUB_TOKEN }}'
+          page, total = 1, 0
+          while True:
+              url = f'https://api.github.com/repos/sasakireijiyagi/video-cut-editor/releases?per_page=100&page={page}'
+              req = urllib.request.Request(url, headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'})
+              with urllib.request.urlopen(req) as r:
+                  releases = json.load(r)
+              if not releases:
+                  break
+              total += sum(a['download_count'] for r in releases for a in r.get('assets', []))
+              page += 1
           print(total)
           ")
           echo "{\"total\": $COUNT}" > docs/downloads.json
