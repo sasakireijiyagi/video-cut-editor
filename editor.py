@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.3"
+APP_VERSION = "1.2.4"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -117,6 +117,8 @@ STRINGS = {
         'export_txt_tip'    : 'SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
         'export_csv'        : 'CSV出力',
         'export_csv_tip'    : 'SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です',
+        'silent_recording'      : '無音が多い録音',
+        'silent_recording_tip'  : '作業記録・観察記録など、長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。',
         'advanced'          : '⚙ 詳細',
         'advanced_tip'      : '[間]の記録・しきつめ・TXT出力などの詳細オプション',
         'drop_hint'         : '🎬\n\n動画・音声をここにドロップ\nまたはクリックしてファイルを選択\n\n複数ファイルをまとめてドロップすると\n一括文字起こしできます',
@@ -186,6 +188,8 @@ STRINGS = {
         'export_txt_tip'    : 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools',
         'export_csv'        : 'CSV',
         'export_csv_tip'    : 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel',
+        'silent_recording'      : 'Silent-heavy recording',
+        'silent_recording_tip'  : 'For recordings with long silences (task observation, fieldwork, etc.).\nEnables word-level timestamps and hallucination suppression (~10–20% slower).',
         'advanced'          : '⚙ Options',
         'advanced_tip'      : 'Advanced options: [Pause] recording, gap filling, TXT export',
         'drop_hint'         : '🎬\n\nDrop a video or audio file here\nor click to choose a file\n\nDrop multiple files at once\nto transcribe them in one go',
@@ -515,10 +519,12 @@ def _active_engine(model: str):
         return ('mlx', MLX_WHISPER_BIN)
     return ('openai', WHISPER_BIN)
 
-def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str):
+def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str,
+                          silent_recording: bool = False):
     """文字起こしの subprocess コマンドを組む。戻り値: (cmd:list, engine:str)。
     mlx_whisper と openai-whisper はフラグ名が異なる（ハイフン/アンダースコア・--verbose）
-    ので、その差をここに集約する。stdout の区間行フォーマットは両者同一。"""
+    ので、その差をここに集約する。stdout の区間行フォーマットは両者同一。
+    silent_recording=True のとき、単語単位タイムスタンプと幻聴抑制を追加する。"""
     engine, binpath = _active_engine(model)
     if engine == 'mlx':
         cmd = [binpath, audio,
@@ -526,14 +532,19 @@ def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str):
                '--output-format', 'srt',
                '--output-dir', outdir,
                '--verbose', 'True',
-               # 直前の出力を次区間に渡さない＝「なるほど」等の繰り返しループ幻聴を防ぐ
                '--condition-on-previous-text', 'False']
+        if silent_recording:
+            cmd += ['--word-timestamps', 'True',
+                    '--hallucination-silence-threshold', '2.0']
     else:
         cmd = [binpath, audio,
                '--model', model,
                '--output_format', 'srt',
                '--output_dir', outdir,
                '--condition_on_previous_text', 'False']
+        if silent_recording:
+            cmd += ['--word_timestamps', 'True',
+                    '--hallucination_silence_threshold', '2.0']
     if language != 'auto':
         cmd += ['--language', language]
     return cmd, engine
@@ -1430,18 +1441,20 @@ class WhisperWorker(QThread):
     def __init__(self, video: str, model: str, language: str,
                  mark_silence: bool = False, silence_sec: float = 1.0,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False, export_csv: bool = False):
+                 export_txt: bool = False, export_csv: bool = False,
+                 silent_recording: bool = False):
         super().__init__()
-        self.video        = video
-        self.model        = model
-        self.language     = language
-        self.mark_silence = mark_silence
-        self.silence_ms   = int(silence_sec * 1000)
-        self.fill_gaps    = fill_gaps
-        self.fill_mode    = fill_mode
-        self.export_txt   = export_txt
-        self.export_csv   = export_csv
-        self._proc        = None
+        self.video            = video
+        self.model            = model
+        self.language         = language
+        self.mark_silence     = mark_silence
+        self.silence_ms       = int(silence_sec * 1000)
+        self.fill_gaps        = fill_gaps
+        self.fill_mode        = fill_mode
+        self.export_txt       = export_txt
+        self.export_csv       = export_csv
+        self.silent_recording = silent_recording
+        self._proc            = None
 
     def cancel(self):
         p = self._proc
@@ -1467,7 +1480,8 @@ class WhisperWorker(QThread):
             _materialize(self.video, progress_cb=_dl)
             self.log.emit('📥 ダウンロード完了' if _lang == 'ja' else '📥 Download complete')
 
-        cmd, engine = _build_transcribe_cmd(self.video, self.model, self.language, outdir)
+        cmd, engine = _build_transcribe_cmd(self.video, self.model, self.language, outdir,
+                                             silent_recording=self.silent_recording)
 
         self.log.emit(f"Whisper: engine={engine}  model={self.model}  lang={self.language}")
         self.log.emit('モデル読み込み中…（初回は10〜30秒ほどかかります）'
@@ -1613,19 +1627,21 @@ class BatchWhisperWorker(QThread):
     def __init__(self, files: List[str], model: str, language: str,
                  mark_silence: bool, silence_sec: float,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False, export_csv: bool = False):
+                 export_txt: bool = False, export_csv: bool = False,
+                 silent_recording: bool = False):
         super().__init__()
-        self.files        = files
-        self.model        = model
-        self.language     = language
-        self.mark_silence = mark_silence
-        self.silence_ms   = int(silence_sec * 1000)
-        self.fill_gaps    = fill_gaps
-        self.fill_mode    = fill_mode
-        self.export_txt   = export_txt
-        self.export_csv   = export_csv
-        self._stop        = False
-        self._proc        = None
+        self.files            = files
+        self.model            = model
+        self.language         = language
+        self.mark_silence     = mark_silence
+        self.silence_ms       = int(silence_sec * 1000)
+        self.fill_gaps        = fill_gaps
+        self.fill_mode        = fill_mode
+        self.export_txt       = export_txt
+        self.export_csv       = export_csv
+        self.silent_recording = silent_recording
+        self._stop            = False
+        self._proc            = None
 
     def cancel(self):
         self._stop = True
@@ -1680,7 +1696,8 @@ class BatchWhisperWorker(QThread):
                           'Loading model… (the first run takes 10–30 seconds)')
 
             outdir = str(Path(video).parent)
-            cmd, _engine = _build_transcribe_cmd(video, self.model, self.language, outdir)
+            cmd, _engine = _build_transcribe_cmd(video, self.model, self.language, outdir,
+                                                  silent_recording=self.silent_recording)
 
             try:
                 self._proc = subprocess.Popen(
@@ -1808,19 +1825,21 @@ class BatchDialog(QDialog):
                  language: str = '日本語',
                  mark_silence: bool = False, silence_sec: float = 1.0,
                  fill_gaps: bool = False, fill_mode: str = 'label',
-                 export_txt: bool = False, export_csv: bool = False):
+                 export_txt: bool = False, export_csv: bool = False,
+                 silent_recording: bool = False):
         super().__init__(parent)
         self.setWindowTitle('複数ファイルの文字起こし' if _lang == 'ja' else 'Transcribe Multiple Files')
         self.setMinimumSize(700, 500)
         self._worker: Optional[BatchWhisperWorker] = None
-        self._default_model    = model
-        self._default_language = language
-        self._default_silence  = mark_silence
-        self._default_silence_sec = silence_sec
-        self._default_fill_gaps = fill_gaps
-        self._default_fill_mode = fill_mode
-        self._default_export_txt = export_txt
-        self._default_export_csv = export_csv
+        self._default_model           = model
+        self._default_language        = language
+        self._default_silence         = mark_silence
+        self._default_silence_sec     = silence_sec
+        self._default_fill_gaps       = fill_gaps
+        self._default_fill_mode       = fill_mode
+        self._default_export_txt      = export_txt
+        self._default_export_csv      = export_csv
+        self._default_silent_recording = silent_recording
         self.setAcceptDrops(True)   # 動画/音声のドラッグ&ドロップでリストに追加
         self._build()
 
@@ -1924,6 +1943,13 @@ class BatchDialog(QDialog):
                                 else 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel')
         self.chk_csv.setChecked(self._default_export_csv)
         cfg.addWidget(self.chk_csv)
+        self.chk_silent_rec = QCheckBox('無音が多い録音' if _lang == 'ja' else 'Silent-heavy recording')
+        self.chk_silent_rec.setToolTip(
+            '作業記録・観察記録など、長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。'
+            if _lang == 'ja' else
+            'For recordings with long silences (task observation, fieldwork, etc.).\nEnables word-level timestamps and hallucination suppression (~10–20% slower).')
+        self.chk_silent_rec.setChecked(self._default_silent_recording)
+        cfg.addWidget(self.chk_silent_rec)
         cfg.addStretch()
         vbox.addLayout(cfg)
 
@@ -2034,7 +2060,8 @@ class BatchDialog(QDialog):
             fill_gaps=self.chk_fill_gaps.isChecked(),
             fill_mode=fill_mode,
             export_txt=self.chk_txt.isChecked(),
-            export_csv=self.chk_csv.isChecked())
+            export_csv=self.chk_csv.isChecked(),
+            silent_recording=self.chk_silent_rec.isChecked())
         self._worker.file_started.connect(self._on_file_started)
         self._worker.file_done.connect(self._on_file_done)
         self._worker.seg_tick.connect(self._on_seg_tick)
@@ -3528,6 +3555,9 @@ class MainWindow(QMainWindow):
         self.chk_export_csv = QCheckBox(tr('export_csv'))
         self.chk_export_csv.setToolTip(tr('export_csv_tip'))
 
+        self.chk_silent_recording = QCheckBox(tr('silent_recording'))
+        self.chk_silent_recording.setToolTip(tr('silent_recording_tip'))
+
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))
 
@@ -3582,6 +3612,7 @@ class MainWindow(QMainWindow):
         adv_v.addLayout(adv_r2)
         adv_v.addWidget(self.chk_export_txt)
         adv_v.addWidget(self.chk_export_csv)
+        adv_v.addWidget(self.chk_silent_recording)
         adv_act = QWidgetAction(adv_menu)
         adv_act.setDefaultWidget(adv_panel)
         adv_menu.addAction(adv_act)
@@ -3785,6 +3816,7 @@ class MainWindow(QMainWindow):
             fill_mode='label' if self.cmb_fill_mode.currentIndex() == 0 else 'blank',
             export_txt=self.chk_export_txt.isChecked(),
             export_csv=self.chk_export_csv.isChecked(),
+            silent_recording=self.chk_silent_recording.isChecked(),
         )
         if files:
             dlg._append_paths(files)
@@ -3857,6 +3889,8 @@ class MainWindow(QMainWindow):
         self.chk_export_txt.setToolTip(tr('export_txt_tip'))
         self.chk_export_csv.setText(tr('export_csv'))
         self.chk_export_csv.setToolTip(tr('export_csv_tip'))
+        self.chk_silent_recording.setText(tr('silent_recording'))
+        self.chk_silent_recording.setToolTip(tr('silent_recording_tip'))
         self.btn_advanced.setText(tr('advanced'))
         self.btn_advanced.setToolTip(tr('advanced_tip'))
         self.lbl_preset.setText('初期設定:' if _lang == 'ja' else 'Preset:')
@@ -4391,6 +4425,7 @@ class MainWindow(QMainWindow):
             fill_mode=fill_mode,
             export_txt=self.chk_export_txt.isChecked(),
             export_csv=self.chk_export_csv.isChecked(),
+            silent_recording=self.chk_silent_recording.isChecked(),
         )
         self.whisper_worker.log.connect(self.log.append)
         self.whisper_worker.done.connect(self._on_transcription_done)
