@@ -8,6 +8,11 @@
   <meta name="keywords" content="文字起こし,自動文字起こし,Whisper,無料,ローカル,動画,字幕,インタビュー,講義,会議,Mac,Windows,EasyTranscribe">
   <meta name="google-site-verification" content="X27hTtGK0DeluBd_bZirCDejo-S46s7V5m6wwHhLbis">
   <link rel="canonical" href="https://sasakireijiyagi.github.io/video-cut-editor/">
+  <link rel="alternate" hreflang="ja" href="https://sasakireijiyagi.github.io/video-cut-editor/">
+  <link rel="alternate" hreflang="en" href="https://sasakireijiyagi.github.io/video-cut-editor/en.html">
+  <link rel="alternate" hreflang="ko" href="https://sasakireijiyagi.github.io/video-cut-editor/ko.html">
+  <link rel="alternate" hreflang="zh" href="https://sasakireijiyagi.github.io/video-cut-editor/zh.html">
+  <link rel="alternate" hreflang="x-default" href="https://sasakireijiyagi.github.io/video-cut-editor/">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sasakireijiyagi.github.io/video-cut-editor/">
   <meta property="og:title" content="おまかせ文字起こし — 動画を開くだけで文字起こし">
@@ -17,6 +22,48 @@
   <meta name="twitter:title" content="おまかせ文字起こし — 動画を開くだけで文字起こし">
   <meta name="twitter:description" content="OpenAI Whisperで100言語対応。完全ローカル・無料・インストーラー付き。Mac / Windows対応の文字起こしツール。">
   <meta name="twitter:image" content="https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "おまかせ文字起こし",
+    "alternateName": "EasyTranscribe",
+    "url": "https://sasakireijiyagi.github.io/video-cut-editor/",
+    "description": "動画を開いてボタンを押すだけ。OpenAI Whisperで100言語に対応した無料の文字起こしツール。完全ローカル動作でプライバシー安心。Mac / Windows対応。",
+    "applicationCategory": "MultimediaApplication",
+    "applicationSubCategory": "文字起こし・字幕作成",
+    "operatingSystem": "macOS, Windows",
+    "softwareVersion": "1.2.3",
+    "inLanguage": "ja",
+    "screenshot": "https://sasakireijiyagi.github.io/video-cut-editor/screenshot.png",
+    "downloadUrl": "https://github.com/sasakireijiyagi/video-cut-editor/releases/latest",
+    "softwareHelp": "https://github.com/sasakireijiyagi/video-cut-editor",
+    "license": "https://github.com/sasakireijiyagi/video-cut-editor",
+    "isAccessibleForFree": true,
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "JPY"
+    },
+    "featureList": [
+      "OpenAI Whisper による100言語対応の自動文字起こし",
+      "完全ローカル動作（外部送信なし）",
+      "ELAN 用 EAF 形式での書き出し",
+      "SRT / TXT / CSV 書き出し",
+      "動画のカット編集・字幕焼き込み",
+      "複数ファイルの一括文字起こし"
+    ],
+    "author": {
+      "@type": "Person",
+      "name": "佐々木玲仁",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "九州大学"
+      }
+    },
+    "identifier": "https://doi.org/10.5281/zenodo.20515527"
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Hina+Mincho&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -234,7 +281,7 @@
       color: #e63946;
       margin-bottom: 0.5rem;
     }
-    .feature h3 {
+    .feature h4 {
       font-size: 0.95rem;
       font-weight: 600;
       color: #1a1a1a;
@@ -434,45 +481,45 @@
   </div>
 
   <section class="features-section">
-    <p class="section-label">Features</p>
+    <h2 class="section-label">Features</h2>
 
     <div class="features-group">
-      <p class="features-group-label">研究・分析用途</p>
+      <h3 class="features-group-label">研究・分析用途</h3>
       <div class="features-grid">
         <div class="feature">
           <div class="feature-label">Transcription</div>
-          <h3>高精度な文字起こし</h3>
+          <h4>高精度な文字起こし</h4>
           <p>OpenAI Whisper で 100 言語に対応。講義・会議・インタビュー動画を自動転写。</p>
         </div>
         <div class="feature">
           <div class="feature-label">Drag &amp; Drop</div>
-          <h3>ドラッグ&amp;ドロップで文字起こし</h3>
+          <h4>ドラッグ&amp;ドロップで文字起こし</h4>
           <p>動画・音声をウィンドウにドロップするだけで開ける。複数ファイルをまとめてドロップすれば一括文字起こしも自動で開始。</p>
         </div>
         <div class="feature">
           <div class="feature-label">Export</div>
-          <h3>EAF 書き出し</h3>
+          <h4>EAF 書き出し</h4>
           <p>会話分析・質的研究向けの注釈ツール ELAN 用の EAF ファイルとして書き出し。</p>
         </div>
       </div>
     </div>
 
     <div class="features-group">
-      <p class="features-group-label">動画制作用途</p>
+      <h3 class="features-group-label">動画制作用途</h3>
       <div class="features-grid">
         <div class="feature">
           <div class="feature-label">Editing</div>
-          <h3>かんたん編集・カット</h3>
+          <h4>かんたん編集・カット</h4>
           <p>文字起こし結果から残したい部分だけ選んで、動画をカット出力。時間の微調整もかんたん。</p>
         </div>
         <div class="feature">
           <div class="feature-label">Filler Cut</div>
-          <h3>フィラーカット</h3>
+          <h4>フィラーカット</h4>
           <p>「えー」「あの」などを 8 言語のリストから自動除去。カスタマイズも可。</p>
         </div>
         <div class="feature">
           <div class="feature-label">Subtitle</div>
-          <h3>字幕焼き込み</h3>
+          <h4>字幕焼き込み</h4>
           <p>太ゴシック・白文字・黒縁取りで映像に直接焼き込み。縦動画も自動対応。</p>
         </div>
       </div>
@@ -482,7 +529,7 @@
 
 
   <section class="citation-section" id="changelog-section" style="display:none;">
-    <p class="section-label">更新履歴</p>
+    <h2 class="section-label">更新履歴</h2>
     <div class="citation-box">
       <div id="changelog-list"></div>
       <p style="margin-top:1rem;"><a href="https://github.com/sasakireijiyagi/video-cut-editor/releases" target="_blank">すべての更新履歴を見る →</a></p>
@@ -490,7 +537,7 @@
   </section>
 
   <section class="citation-section">
-    <p class="section-label">Citation</p>
+    <h2 class="section-label">Citation</h2>
     <div class="citation-box">
       <p>研究等でご利用の際は、以下のように引用してください：</p>
       <br>
