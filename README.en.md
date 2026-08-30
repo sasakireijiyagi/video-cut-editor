@@ -237,17 +237,31 @@ Click **"📂 Batch Transcription"** to transcribe multiple videos at once.
 
 ## Whisper models
 
-| Model | Accuracy | Speed | Notes |
-|-------|----------|-------|-------|
-| large-v3 ★ | ◎ Best | Slow | Recommended |
-| medium ★ | ○ | Normal | |
-| small ★ | △ | Fast | |
-| base ★ | △ | Fastest | |
-| turbo | ○ | Fast | Downloads on first use |
+**Not sure which to pick? Just leave it as it is.** The default, `large-v3-turbo`, is the recommended model.
 
-**★** = already downloaded locally.  
-Models without ★ download automatically on first use (large-v3 ≈ 3 GB).  
-Running on CPU: expect **3–10× real-time** processing.
+| Model | Accuracy | Speed | Size (approx.) | Notes |
+|-------|----------|-------|------|-------|
+| **large-v3-turbo** | ◎ Near-best | Fast | ~1.6 GB | **Recommended · default** |
+| large-v3 | ◎ Best | Slow | ~2.9 GB | When accuracy matters most |
+| medium | ○ | Normal | ~1.5 GB | About the same size as turbo |
+| small | △ | Fast | ~0.5 GB | Quick review passes |
+| base | △ | Very fast | ~0.15 GB | Quick review passes |
+| tiny | △ | Fastest | ~0.08 GB | Smoke-testing |
+
+### "Isn't large too heavy?"
+
+**`large-v3-turbo` is not as heavy as its name suggests.** It is about the same size as `medium`, comes close to `large-v3` in accuracy, and is faster than both. There is rarely any reason to pick `medium` just to keep things light.
+
+The heavy one is `large-v3` (roughly twice the size of turbo) — pick it only when you want maximum accuracy.
+
+### Downloads
+
+Models prefixed with **★** are already downloaded and ready to use (this varies by machine). Models without ★ download automatically the first time you use them.
+
+### How long it takes
+
+- **Apple Silicon Macs** (M1 and later): runs on the GPU via mlx-whisper, and is considerably faster
+- **Windows / Intel Macs**: runs on the CPU — expect roughly **3–10× real-time**
 
 ---
 
