@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.5"
+APP_VERSION = "1.2.6"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -352,8 +352,114 @@ def parse_srt(text: str) -> List[SRTEntry]:
 # ffmpeg worker
 # ──────────────────────────────────────────────────────────────────
 
+# macOS 用 ffmpeg の静的ビルド配布元。
+# Homebrew を使わないのは、GUIアプリから公式インストーラを走らせられないため
+# （確認プロンプトと sudo が /dev/tty を要求するが、Finder 起動のアプリには
+# 制御端末がない）。加えて Homebrew の ffmpeg 9.x は libass 依存が外れており、
+# 入っても字幕焼き込みが動かない。
+# 下記は libass / fontconfig / freetype / harfbuzz を含む単一バイナリ。
+_FFMPEG_BUILDS = {
+    'arm64':  {'url': 'https://www.osxexperts.net/ffmpeg9arm.zip',
+               'sha256': '591260c945d0eef150e3bf82b0ef988bd36a9cecc18ff05d6679617159f0a95e'},
+    'x86_64': {'url': 'https://www.osxexperts.net/ffmpeg80intel.zip',
+               'sha256': 'df3f1e3facdc1ae0ad0bd898cdfb072fbc9641bf47b11f172844525a05db8d11'},
+}
+
+
+def _app_support_dir() -> Path:
+    """アプリ専用の置き場。ユーザー権限で書けるので管理者パスワードが要らない。"""
+    if sys.platform == 'win32':
+        base = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local'))
+    elif sys.platform == 'darwin':
+        base = Path.home() / 'Library' / 'Application Support'
+    else:
+        base = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local' / 'share'))
+    return base / 'EasyTranscribe'
+
+
+def _bundled_ffmpeg_path() -> Path:
+    """セットアップで取得した ffmpeg の置き場所。"""
+    name = 'ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'
+    return _app_support_dir() / 'bin' / name
+
+
+def _ffmpeg_has_libass(path: str) -> bool:
+    """字幕焼き込みに必要な libass を含むビルドか調べる。
+
+    Homebrew の ffmpeg は 9.x で libass 依存が外れており、入っていても
+    焼き込みだけが失敗する。判定できないときは True を返して黙って通す
+    （警告を出すのは確証があるときだけにする）。
+    """
+    try:
+        out = subprocess.run([path, '-version'], capture_output=True, text=True,
+                             timeout=10).stdout
+    except Exception:
+        return True
+    return ('--enable-libass' in out) if 'configuration:' in out else True
+
+
+def _install_ffmpeg_macos(log=lambda s: None, progress=lambda p: None) -> str:
+    """macOS 用 ffmpeg（静的ビルド）を取得してユーザー領域に置く。
+
+    管理者パスワードも Homebrew も要らない。成功したらそのパスを返す。
+    失敗時は例外を投げる。
+    """
+    import hashlib, urllib.request, zipfile, tempfile
+
+    arch = platform.machine()
+    build = _FFMPEG_BUILDS.get('arm64' if arch == 'arm64' else 'x86_64')
+    if not build:
+        raise RuntimeError(f'未対応のアーキテクチャです: {arch}')
+
+    dest = _bundled_ffmpeg_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        zip_path = Path(tmp) / 'ffmpeg.zip'
+        log('ffmpeg をダウンロード中…（約22MB）')
+        with urllib.request.urlopen(build['url'], timeout=60) as r:
+            total = int(r.headers.get('Content-Length') or 0)
+            got = 0
+            with open(zip_path, 'wb') as f:
+                while chunk := r.read(65536):
+                    f.write(chunk)
+                    got += len(chunk)
+                    if total:
+                        progress(int(got * 100 / total))
+
+        log('ファイルを検証中…')
+        digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+
+        with zipfile.ZipFile(zip_path) as z:
+            member = next((n for n in z.namelist()
+                           if Path(n).name == 'ffmpeg' and not n.startswith('__MACOSX')), None)
+            if not member:
+                raise RuntimeError('ダウンロードした書庫に ffmpeg が見つかりません')
+            z.extract(member, tmp)
+            extracted = Path(tmp) / member
+
+        bin_digest = hashlib.sha256(extracted.read_bytes()).hexdigest()
+        if build['sha256'] not in (digest, bin_digest):
+            raise RuntimeError(
+                'ダウンロードしたファイルの検証に失敗しました。\n'
+                '配布元が更新された可能性があります。アプリの更新をご確認ください。')
+
+        shutil.move(str(extracted), str(dest))
+
+    dest.chmod(0o755)
+    # ダウンロード物には検疫属性が付き、初回実行が拒否されるため落とす
+    subprocess.run(['xattr', '-dr', 'com.apple.quarantine', str(dest)],
+                   capture_output=True)
+    log(f'ffmpeg を配置しました: {dest}')
+    return str(dest)
+
+
 def _find_ffmpeg() -> str:
-    # まず PATH から探す
+    # セットアップで入れた専用ビルドを最優先（libass 入りが保証されるため）
+    own = _bundled_ffmpeg_path()
+    if own.is_file() and os.access(own, os.X_OK):
+        return str(own)
+    # 次に PATH
     w = shutil.which('ffmpeg')
     if w:
         return w
@@ -428,6 +534,11 @@ def _find_whisper() -> str:
             w_base = Path(base) / 'bin' / 'whisper'
             if w_base.exists():
                 return str(w_base)
+        # `pip install --user` の入る先。conda を使っていない素のMacではここ。
+        # GUI起動のアプリは PATH が最小限なので shutil.which では拾えない。
+        hits = sorted(Path.home().glob('Library/Python/3.*/bin/whisper'))
+        if hits:
+            return str(hits[-1])
     return 'whisper'
 
 def _find_mlx_whisper() -> str:
@@ -449,6 +560,10 @@ def _find_mlx_whisper() -> str:
         w_base = Path(base) / 'bin' / 'mlx_whisper'
         if w_base.exists():
             return str(w_base)
+    # `pip install --user` の入る先（conda を使っていない素のMac）
+    hits = sorted(Path.home().glob('Library/Python/3.*/bin/mlx_whisper'))
+    if hits:
+        return str(hits[-1])
     return ''
 
 FFMPEG_BIN  = _find_ffmpeg()
@@ -486,6 +601,32 @@ def _real_python_on_path() -> str:
         except Exception:
             continue
     return ''
+
+def _macos_clt_installed() -> bool:
+    """Xcodeコマンドラインツールが入っているか。macOS の python3 はこれが無いと
+    実体がなく、実行するとインストーラのダイアログを出すだけで失敗する。"""
+    try:
+        r = subprocess.run(['xcode-select', '-p'], capture_output=True, text=True, timeout=10)
+        return r.returncode == 0 and bool(r.stdout.strip())
+    except Exception:
+        return False
+
+
+def _request_macos_clt() -> None:
+    """Xcodeコマンドラインツールの導入をOSに依頼する（Apple純正のダイアログが出る）。
+
+    管理者パスワードは不要で、GUIアプリからでも呼べる。Homebrew と違い
+    制御端末を要求しないため、ここは自動化できる。
+    """
+    subprocess.Popen(['xcode-select', '--install'],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _needs_user_flag(py: str) -> bool:
+    """システム付属の Python なら `pip install --user` が要る。
+    システム領域には書き込めず、権限昇格なしでは失敗するため。"""
+    return py.startswith('/usr/bin/') or py.startswith('/System/')
+
 
 def _pip_python() -> str:
     """`pip install` を実行する Python を返す。見つからなければ ''。
@@ -665,6 +806,74 @@ def _is_whisper_ok() -> bool:
             return True
     return False
 
+_BREW_FFMPEG_CMD = 'brew install homebrew-ffmpeg/ffmpeg/ffmpeg'
+
+
+def _show_ffmpeg_manual_dialog(parent=None):
+    """ffmpeg を自動で用意できなかったときに、手作業での入れ方を案内する。
+
+    標準の `brew install ffmpeg` ではなく tap 版を案内するのは、Homebrew の
+    現行 formula が libass を含まず、字幕焼き込みが動かないため。
+    """
+    dlg = QDialog(parent)
+    dlg.setWindowTitle('ffmpeg の手動インストール' if _lang == 'ja' else 'Install ffmpeg manually')
+    dlg.setMinimumWidth(560)
+    v = QVBoxLayout(dlg)
+    v.setSpacing(10)
+
+    if _lang == 'ja':
+        head = ('ffmpeg を自動で用意できませんでした。\n'
+                'お手数ですが、以下の手順でインストールしてください。')
+        step1 = '① 「ターミナル」を開く（Launchpad →「その他」→「ターミナル」）'
+        step2 = '② 下のコマンドをコピーして貼り付け、Enterキーを押す'
+        note  = ('※ 途中で Mac のログインパスワードを聞かれます。\n'
+                 '   入力しても画面には何も表示されませんが、正しく入力されています。\n'
+                 '※ 完了までに10分以上かかることがあります。\n'
+                 '※ 終わったら、このアプリを再起動してください。')
+        copy_txt, done_txt, copied = 'コマンドをコピー', '閉じる', 'コピーしました'
+    else:
+        head = ('ffmpeg could not be set up automatically.\n'
+                'Please install it with the following steps.')
+        step1 = '1. Open Terminal (Launchpad → Other → Terminal)'
+        step2 = '2. Copy the command below, paste it, and press Enter'
+        note  = ('* You will be asked for your Mac login password.\n'
+                 '  Nothing appears on screen while typing — that is normal.\n'
+                 '* It may take 10 minutes or more.\n'
+                 '* Restart this app when it finishes.')
+        copy_txt, done_txt, copied = 'Copy command', 'Close', 'Copied'
+
+    lbl = QLabel(head); lbl.setWordWrap(True)
+    v.addWidget(lbl)
+    for s in (step1, step2):
+        w = QLabel(s); w.setWordWrap(True)
+        v.addWidget(w)
+
+    cmd = QLineEdit(_BREW_FFMPEG_CMD)
+    cmd.setReadOnly(True)
+    cmd.setStyleSheet('font-family: Menlo, monospace; padding: 8px; background: #f4f4f2;')
+    v.addWidget(cmd)
+
+    btn_copy = QPushButton(copy_txt)
+    def _copy():
+        QApplication.clipboard().setText(_BREW_FFMPEG_CMD)
+        btn_copy.setText(copied)
+    btn_copy.clicked.connect(_copy)
+
+    n = QLabel(note); n.setWordWrap(True)
+    n.setStyleSheet('color: #666; font-size: 11px;')
+    v.addWidget(n)
+
+    row = QHBoxLayout()
+    row.addWidget(btn_copy)
+    row.addStretch()
+    btn_close = QPushButton(done_txt)
+    btn_close.clicked.connect(dlg.accept)
+    row.addWidget(btn_close)
+    v.addLayout(row)
+
+    dlg.exec()
+
+
 class SetupDialog(QDialog):
     """ffmpeg / Whisper が見つからないときに自動インストールを提案するダイアログ"""
 
@@ -742,10 +951,39 @@ class SetupDialog(QDialog):
         self._worker = SetupWorker(install_ffmpeg, install_whisper)
         self._worker.log_line.connect(self._append_log)
         self._worker.finished.connect(self._on_done)
+        self._worker.ffmpeg_manual.connect(self._show_ffmpeg_manual)
+        self._worker.clt_requested.connect(self._show_clt_notice)
         self._worker.start()
 
     def _append_log(self, line: str):
         self.log.append(line)
+
+    def _show_ffmpeg_manual(self):
+        """自動取得が失敗したときの逃げ道。Homebrew での入れ方を案内する。"""
+        _show_ffmpeg_manual_dialog(self)
+
+    def _show_clt_notice(self):
+        """コマンドラインツールの導入を促したことを、平易な言葉で伝える。"""
+        if _lang == 'ja':
+            title = 'あと一歩です'
+            body = ('文字起こしの準備に必要な部品が、このMacにまだありません。\n\n'
+                    'Appleの「コマンドラインツールをインストール」という画面が\n'
+                    '出ましたか？ 出ていれば「インストール」を押してください。\n\n'
+                    '・Appleが配布している正規のものです\n'
+                    '・パスワードの入力は不要です\n'
+                    '・容量が大きいため、10〜20分ほどかかります\n\n'
+                    '終わったら、このアプリをいったん終了して開き直し、\n'
+                    'もう一度セットアップを実行してください。')
+        else:
+            title = 'Almost there'
+            body = ('A component required for transcription is not on this Mac yet.\n\n'
+                    'Did a window titled "Install Command Line Developer Tools" appear?\n'
+                    'If so, click Install.\n\n'
+                    '- It comes from Apple and is safe.\n'
+                    '- No password is required.\n'
+                    '- It is large, so it takes 10-20 minutes.\n\n'
+                    'When it finishes, quit and reopen this app, then run Setup again.')
+        QMessageBox.information(self, title, body)
 
     def _on_done(self, success: bool):
         self.progress.setVisible(False)
@@ -769,6 +1007,8 @@ class SetupDialog(QDialog):
 class SetupWorker(QThread):
     log_line = pyqtSignal(str)
     finished = pyqtSignal(bool)
+    ffmpeg_manual = pyqtSignal()   # 自動取得に失敗 → 手順を案内する
+    clt_requested = pyqtSignal()   # Xcodeコマンドラインツールの導入を促した
 
     def __init__(self, ffmpeg: bool, whisper: bool):
         super().__init__()
@@ -777,16 +1017,23 @@ class SetupWorker(QThread):
 
     def run(self):
         try:
-            if self.do_ffmpeg and sys.platform != 'win32':
-                self.log_line.emit('Homebrewを確認中...')
-                brew = shutil.which('brew')
-                if not brew:
-                    self.log_line.emit('Homebrewをインストール中...')
-                    cmd = '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-                    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                    for line in proc.stdout:
-                        self.log_line.emit(line.rstrip())
-                    proc.wait()
+            if self.do_ffmpeg and sys.platform == 'darwin':
+                # Homebrew は使わない。GUIアプリからは公式インストーラの確認
+                # プロンプトと sudo に応答できず（制御端末がない）、さらに
+                # 現行 formula は libass を含まないため焼き込みが動かない。
+                try:
+                    path = _install_ffmpeg_macos(
+                        log=self.log_line.emit,
+                        progress=lambda p: self.log_line.emit(f'  {p}%') if p % 25 == 0 else None)
+                    if not _ffmpeg_has_libass(path):
+                        self.log_line.emit('⚠️ このビルドは字幕焼き込みに対応していません。')
+                    else:
+                        self.log_line.emit('✓ ffmpeg の準備ができました（字幕焼き込みにも対応）。')
+                except Exception as e:
+                    self.log_line.emit(f'自動取得に失敗しました: {e}')
+                    self.ffmpeg_manual.emit()
+
+            if self.do_ffmpeg and sys.platform not in ('win32', 'darwin'):
                 self.log_line.emit('ffmpegをインストール中...')
                 proc = subprocess.Popen(['brew', 'install', 'ffmpeg'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
@@ -851,15 +1098,29 @@ class SetupWorker(QThread):
                 pkg = 'mlx-whisper' if _IS_APPLE_SILICON else 'openai-whisper'
                 if sys.platform != 'win32':
                     py = _pip_python()   # win32は上のブロックで解決済みのpyを使う（上書きしない）
+
+                # 素のMacには使えるPythonが無い。/usr/bin/python3 はコマンドライン
+                # ツール未導入だと実体がなく、実行してもインストーラを出すだけ。
+                if not py and sys.platform == 'darwin' and not _macos_clt_installed():
+                    self.log_line.emit('Pythonを使えるようにする必要があります。')
+                    self.log_line.emit('Appleの「コマンドラインツール」のインストール画面を開きます…')
+                    _request_macos_clt()
+                    self.clt_requested.emit()
+                    self.finished.emit(False)
+                    return
+
                 if not py:
                     self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
                     self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
                     self.finished.emit(False)
                     return
+                cmd = [py, '-m', 'pip', 'install', pkg]
+                if _needs_user_flag(py):
+                    cmd.insert(4, '--user')   # システムPythonは --user でないと書けない
                 self.log_line.emit(f'Whisper（{pkg}）をインストール中...')
-                self.log_line.emit(f'  （うまくいかない場合は手動で: pip install {pkg}）')
+                self.log_line.emit(f'  （うまくいかない場合は手動で: {" ".join(cmd[1:])}）')
                 proc = subprocess.Popen(
-                    [py, '-m', 'pip', 'install', pkg],
+                    cmd,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
                     self.log_line.emit(line.rstrip())
