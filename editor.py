@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.6"
+APP_VERSION = "1.2.7"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -366,6 +366,20 @@ _FFMPEG_BUILDS = {
 }
 
 
+def _ssl_context():
+    """HTTPS 用の SSL コンテキスト。
+
+    PyInstaller で固めたアプリは CA 証明書を持たず，そのままだと
+    CERTIFICATE_VERIFY_FAILED で通信が全部失敗する。同梱した certifi を使う。
+    """
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
 def _app_support_dir() -> Path:
     """アプリ専用の置き場。ユーザー権限で書けるので管理者パスワードが要らない。"""
     if sys.platform == 'win32':
@@ -417,7 +431,7 @@ def _install_ffmpeg_macos(log=lambda s: None, progress=lambda p: None) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = Path(tmp) / 'ffmpeg.zip'
         log('ffmpeg をダウンロード中…（約22MB）')
-        with urllib.request.urlopen(build['url'], timeout=60) as r:
+        with urllib.request.urlopen(build['url'], timeout=60, context=_ssl_context()) as r:
             total = int(r.headers.get('Content-Length') or 0)
             got = 0
             with open(zip_path, 'wb') as f:
@@ -806,7 +820,22 @@ def _is_whisper_ok() -> bool:
             return True
     return False
 
-_BREW_FFMPEG_CMD = 'brew install homebrew-ffmpeg/ffmpeg/ffmpeg'
+def _manual_ffmpeg_command() -> str:
+    """手動インストール用のコマンドを組み立てる。
+
+    Homebrew は前提にしない。この案内が出るのは自動取得に失敗した人で，
+    その多くは Homebrew を持っていない（持っていれば `brew: command not
+    found` になり，案内自体が無駄になる）。
+    そのため curl で直接取ってきて所定の場所に置く形にする。
+    """
+    arch = 'arm64' if platform.machine() == 'arm64' else 'x86_64'
+    url = _FFMPEG_BUILDS[arch]['url']
+    d = '"$HOME/Library/Application Support/EasyTranscribe/bin"'
+    return (f'mkdir -p {d} && curl -L -o /tmp/ff.zip {url} && '
+            f'unzip -o /tmp/ff.zip -d /tmp && mv /tmp/ffmpeg {d}/ && '
+            f'chmod +x {d}/ffmpeg && '
+            f'xattr -dr com.apple.quarantine {d}/ffmpeg && '
+            f'echo "----- 完了しました。アプリを再起動してください -----"')
 
 
 def _show_ffmpeg_manual_dialog(parent=None):
@@ -826,20 +855,18 @@ def _show_ffmpeg_manual_dialog(parent=None):
                 'お手数ですが，以下の手順でインストールしてください。')
         step1 = '① 「ターミナル」を開く（Launchpad →「その他」→「ターミナル」）'
         step2 = '② 下のコマンドをコピーして貼り付け，Enterキーを押す'
-        note  = ('※ 途中で Mac のログインパスワードを聞かれます。\n'
-                 '   入力しても画面には何も表示されませんが，正しく入力されています。\n'
-                 '※ 完了までに10分以上かかることがあります。\n'
-                 '※ 終わったら，このアプリを再起動してください。')
+        note  = ('※ パスワードの入力は不要です。1分ほどで終わります。\n'
+                 '※「完了しました」と表示されたら，このアプリを再起動してください。\n'
+                 '※ 貼り付けても何も起きない場合は，最後に Enterキー を押してください。')
         copy_txt, done_txt, copied = 'コマンドをコピー', '閉じる', 'コピーしました'
     else:
         head = ('ffmpeg could not be set up automatically.\n'
                 'Please install it with the following steps.')
         step1 = '1. Open Terminal (Launchpad → Other → Terminal)'
         step2 = '2. Copy the command below, paste it, and press Enter'
-        note  = ('* You will be asked for your Mac login password.\n'
-                 '  Nothing appears on screen while typing — that is normal.\n'
-                 '* It may take 10 minutes or more.\n'
-                 '* Restart this app when it finishes.')
+        note  = ('* No password is required. It takes about a minute.\n'
+                 '* When it prints "completed", restart this app.\n'
+                 '* If nothing happens after pasting, press Enter.')
         copy_txt, done_txt, copied = 'Copy command', 'Close', 'Copied'
 
     lbl = QLabel(head); lbl.setWordWrap(True)
@@ -848,14 +875,15 @@ def _show_ffmpeg_manual_dialog(parent=None):
         w = QLabel(s); w.setWordWrap(True)
         v.addWidget(w)
 
-    cmd = QLineEdit(_BREW_FFMPEG_CMD)
+    _cmd_text = _manual_ffmpeg_command()
+    cmd = QLineEdit(_cmd_text)
     cmd.setReadOnly(True)
     cmd.setStyleSheet('font-family: Menlo, monospace; padding: 8px; background: #f4f4f2;')
     v.addWidget(cmd)
 
     btn_copy = QPushButton(copy_txt)
     def _copy():
-        QApplication.clipboard().setText(_BREW_FFMPEG_CMD)
+        QApplication.clipboard().setText(_cmd_text)
         btn_copy.setText(copied)
     btn_copy.clicked.connect(_copy)
 
@@ -1014,6 +1042,7 @@ class SetupWorker(QThread):
         super().__init__()
         self.do_ffmpeg  = ffmpeg
         self.do_whisper = whisper
+        self._ffmpeg_failed = False
 
     def run(self):
         try:
@@ -1031,6 +1060,7 @@ class SetupWorker(QThread):
                         self.log_line.emit('✓ ffmpeg の準備ができました（字幕焼き込みにも対応）。')
                 except Exception as e:
                     self.log_line.emit(f'自動取得に失敗しました: {e}')
+                    self._ffmpeg_failed = True
                     self.ffmpeg_manual.emit()
 
             if self.do_ffmpeg and sys.platform not in ('win32', 'darwin'):
@@ -1129,7 +1159,8 @@ class SetupWorker(QThread):
             if sys.platform == 'win32' and self.do_ffmpeg:
                 self.log_line.emit('')
                 self.log_line.emit('⚠ Windowsの場合，PATHを反映するためにPCを再起動してください。')
-            self.finished.emit(True)
+            # ffmpeg が入っていないのに「完了」と出すと利用者を混乱させる
+            self.finished.emit(not self._ffmpeg_failed)
         except Exception as e:
             self.log_line.emit(str(e))
             self.finished.emit(False)
