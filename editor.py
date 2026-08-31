@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.4"
+APP_VERSION = "1.2.5"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -971,24 +971,49 @@ FILLER_LISTS = {
 }
 
 # 文字起こし対象言語（表示名はUI言語に合わせる）
-_LANG_CODES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ar', 'hi', 'id', 'auto']
+_LANG_CODES = ['ja', 'en', 'zh', 'ko', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ar', 'hi', 'id', 'km', 'auto']
+
+# Whisper の学習データが少なく、turbo での精度低下が大きいと見込まれる言語
+_LOW_RESOURCE_LANGS = {'km'}
 _LANG_NAMES = {
     'ja': {'ja': '日本語', 'en': '英語', 'zh': '中国語', 'ko': '韓国語',
            'es': 'スペイン語', 'fr': 'フランス語', 'de': 'ドイツ語',
            'pt': 'ポルトガル語', 'it': 'イタリア語', 'ru': 'ロシア語',
            'ar': 'アラビア語', 'hi': 'ヒンディー語', 'id': 'インドネシア語',
-           'auto': '自動検出'},
+           'km': 'クメール語', 'auto': '自動検出'},
     'en': {'ja': 'Japanese', 'en': 'English', 'zh': 'Chinese', 'ko': 'Korean',
            'es': 'Spanish', 'fr': 'French', 'de': 'German',
            'pt': 'Portuguese', 'it': 'Italian', 'ru': 'Russian',
            'ar': 'Arabic', 'hi': 'Hindi', 'id': 'Indonesian',
-           'auto': 'Auto detect'},
+           'km': 'Khmer', 'auto': 'Auto detect'},
 }
 
 def _lang_display_names() -> list:
     """現在のUI言語での言語表示名リスト（コンボボックス用・_LANG_CODES順）。"""
     names = _LANG_NAMES['ja' if _lang == 'ja' else 'en']
     return [names[c] for c in _LANG_CODES]
+
+def _recommended_model(lang_code: str) -> str:
+    """起こす言語に応じた推奨モデル。
+
+    large-v3-turbo はデコーダを削って高速化しているぶん、学習データの少ない
+    言語では large-v3 より精度が落ちやすい。クメール語のように元々ぎりぎりの
+    言語では、その差が実用可否を分けうるため large-v3 を薦める。
+    """
+    return 'large-v3' if lang_code in _LOW_RESOURCE_LANGS else 'large-v3-turbo'
+
+
+def _model_item_text(model: str, cached: set, rec_model: str) -> str:
+    """モデル選択コンボの1項目の表示文字列（★印と「◀ 推奨」を付ける）。"""
+    mark = '★ ' if model in cached else ''
+    rec = (' ◀ 推奨' if _lang == 'ja' else ' ◀ recommended') if model == rec_model else ''
+    return f'{mark}{model}{rec}'
+
+
+def _model_name_of(item_text: str) -> str:
+    """コンボの表示文字列からモデル名だけを取り出す。"""
+    return item_text.lstrip('★ ').split(' ')[0]
+
 
 def _lang_code_of(display_name: str) -> str:
     """表示名→whisper言語コード。日英どちらの表示名でも引ける。既定は 'ja'。"""
@@ -1891,11 +1916,11 @@ class BatchDialog(QDialog):
         cfg = QHBoxLayout()
         cfg.addWidget(QLabel('モデル:' if _lang == 'ja' else 'Model:'))
         self.cmb_model = QComboBox()
+        self._models = ['large-v3-turbo','large-v3','turbo','medium','small','base','tiny']
+        rec_model = _recommended_model(_lang_code_of(self._default_language))
         cached = _cached_models()
-        for m in ['large-v3-turbo','large-v3','turbo','medium','small','base','tiny']:
-            cached_mark = '★ ' if m in cached else ''
-            rec = (' ◀ 推奨' if _lang == 'ja' else ' ◀ recommended') if m == 'large-v3-turbo' else ''
-            self.cmb_model.addItem(f'{cached_mark}{m}{rec}')
+        for m in self._models:
+            self.cmb_model.addItem(_model_item_text(m, cached, rec_model))
         # デフォルトモデルを選択
         stem = self._default_model
         for i in range(self.cmb_model.count()):
@@ -1908,6 +1933,7 @@ class BatchDialog(QDialog):
         self.cmb_lang = QComboBox()
         self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setCurrentText(self._default_language)
+        self.cmb_lang.currentIndexChanged.connect(self._refresh_model_marks)
         cfg.addWidget(self.cmb_lang)
         cfg.addSpacing(12)
         self.chk_silence = QCheckBox('[間]を記録' if _lang == 'ja' else 'Record [Pause]')
@@ -2039,6 +2065,14 @@ class BatchDialog(QDialog):
     def _remove_selected(self):
         for item in self.file_list.selectedItems():
             self.file_list.takeItem(self.file_list.row(item))
+
+    def _refresh_model_marks(self):
+        """起こす言語に応じて「◀ 推奨」の位置を付け替える（選択は動かさない）。"""
+        cached = _cached_models()
+        rec_model = _recommended_model(_lang_code_of(self.cmb_lang.currentText()))
+        for i in range(self.cmb_model.count()):
+            m = _model_name_of(self.cmb_model.itemText(i))
+            self.cmb_model.setItemText(i, _model_item_text(m, cached, rec_model))
 
     def _start(self):
         files = [self.file_list.item(i).text()
@@ -3513,11 +3547,15 @@ class MainWindow(QMainWindow):
         self.cmb_model = QComboBox()
         self.cmb_model.setMinimumWidth(180)
         self.cmb_model.setToolTip(tr('model_tip'))
-        self._populate_models()
 
+        # 言語コンボが先。_populate_models() が現在の言語から推奨モデルを決めるため
         self.cmb_lang = QComboBox()
         self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setToolTip(tr('lang_tip'))
+
+        self._populate_models()
+        # 起こす言語を変えたら「◀ 推奨」の位置を付け替える（選択は動かさない）
+        self.cmb_lang.currentIndexChanged.connect(self._refresh_model_marks)
 
         self.btn_transcribe = QPushButton(tr('transcribe_btn'))
         self.btn_transcribe.setEnabled(False)
@@ -3872,6 +3910,7 @@ class MainWindow(QMainWindow):
         names = _LANG_NAMES['ja' if _lang == 'ja' else 'en']
         self.cmb_lang.setCurrentText(names[cur_code])
         self.cmb_lang.blockSignals(False)
+        self._refresh_model_marks()   # 「◀ 推奨」の表記もUI言語に合わせる
         self.btn_transcribe.setText(tr('transcribe_btn'))
         self.btn_transcribe_cancel.setText(tr('transcribe_cancel'))
         self.btn_batch.setText('📂 複数ファイルを指定' if _lang == 'ja' else '📂 Multiple Files…')
@@ -4391,6 +4430,7 @@ class MainWindow(QMainWindow):
 
     def _populate_models(self):
         cached = _cached_models()
+        rec_model = _recommended_model(_lang_code_of(self.cmb_lang.currentText()))
 
         all_models = [
             'large-v3-turbo', 'large-v3', 'turbo',
@@ -4399,12 +4439,22 @@ class MainWindow(QMainWindow):
         ]
         default_idx = 0
         for i, m in enumerate(all_models):
-            cached_mark = '★ ' if m in cached else ''
-            rec = (' ◀ 推奨' if _lang == 'ja' else ' ◀ recommended') if m == 'large-v3-turbo' else ''
-            self.cmb_model.addItem(f'{cached_mark}{m}{rec}')
+            self.cmb_model.addItem(_model_item_text(m, cached, rec_model))
             if m in cached and default_idx == 0:
                 default_idx = i
         self.cmb_model.setCurrentIndex(default_idx)
+
+    def _refresh_model_marks(self):
+        """起こす言語に応じて「◀ 推奨」の位置を付け替える。
+
+        表示を変えるだけで選択は動かさない。自動で選び直すと、未ダウンロードの
+        large-v3（約2.9GB）を言語を選んだだけで取りに行ってしまうため。
+        """
+        cached = _cached_models()
+        rec_model = _recommended_model(_lang_code_of(self.cmb_lang.currentText()))
+        for i in range(self.cmb_model.count()):
+            m = _model_name_of(self.cmb_model.itemText(i))
+            self.cmb_model.setItemText(i, _model_item_text(m, cached, rec_model))
 
     def _transcribe(self):
         if not _is_whisper_ok():

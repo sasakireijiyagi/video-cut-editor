@@ -63,7 +63,7 @@ Open video → Auto-transcribe (Whisper) → Uncheck unwanted segments → Expor
 
 ## Supported transcription languages — 100 languages
 
-Whisper supports **100 languages** for transcription. The app's language selector offers 13 major languages + auto-detect.
+Whisper supports **100 languages** for transcription. The app's language selector offers 14 major languages + auto-detect.
 
 | Region | Languages |
 |--------|-----------|
