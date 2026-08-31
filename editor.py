@@ -114,11 +114,11 @@ STRINGS = {
         'fill_mode_label'   : '[間]表示',
         'fill_mode_blank'   : '空欄',
         'export_txt'        : 'TXT出力',
-        'export_txt_tip'    : 'SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
+        'export_txt_tip'    : 'SRTに加えて，時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です',
         'export_csv'        : 'CSV出力',
-        'export_csv_tip'    : 'SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です',
+        'export_csv_tip'    : 'SRTに加えて，開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です',
         'silent_recording'      : '無音が多い録音',
-        'silent_recording_tip'  : '作業記録・観察記録など、長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。',
+        'silent_recording_tip'  : '作業記録・観察記録など，長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。',
         'advanced'          : '⚙ 詳細',
         'advanced_tip'      : '[間]の記録・しきつめ・TXT出力などの詳細オプション',
         'drop_hint'         : '🎬\n\n動画・音声をここにドロップ\nまたはクリックしてファイルを選択\n\n複数ファイルをまとめてドロップすると\n一括文字起こしできます',
@@ -823,13 +823,13 @@ def _show_ffmpeg_manual_dialog(parent=None):
 
     if _lang == 'ja':
         head = ('ffmpeg を自動で用意できませんでした。\n'
-                'お手数ですが、以下の手順でインストールしてください。')
+                'お手数ですが，以下の手順でインストールしてください。')
         step1 = '① 「ターミナル」を開く（Launchpad →「その他」→「ターミナル」）'
-        step2 = '② 下のコマンドをコピーして貼り付け、Enterキーを押す'
+        step2 = '② 下のコマンドをコピーして貼り付け，Enterキーを押す'
         note  = ('※ 途中で Mac のログインパスワードを聞かれます。\n'
-                 '   入力しても画面には何も表示されませんが、正しく入力されています。\n'
+                 '   入力しても画面には何も表示されませんが，正しく入力されています。\n'
                  '※ 完了までに10分以上かかることがあります。\n'
-                 '※ 終わったら、このアプリを再起動してください。')
+                 '※ 終わったら，このアプリを再起動してください。')
         copy_txt, done_txt, copied = 'コマンドをコピー', '閉じる', 'コピーしました'
     else:
         head = ('ffmpeg could not be set up automatically.\n'
@@ -890,7 +890,7 @@ class SetupDialog(QDialog):
             # 既存ユーザー(旧openai-whisper)へ、GPU対応の新エンジン導入を案内
             if _lang == 'ja':
                 msg = ('🚀 v1.1.0 から音声認識エンジンが新しくなりました（GPU対応の mlx-whisper）。\n'
-                       '今は旧エンジンで動いています。Whisper を入れ直すと、Mac の GPU で\n'
+                       '今は旧エンジンで動いています。Whisper を入れ直すと，Mac の GPU で\n'
                        '文字起こしが大幅に高速化します（large-v3 が実用速度に）。\n'
                        '今すぐ入れ直しますか？（インターネット接続が必要です）')
             else:
@@ -963,16 +963,16 @@ class SetupDialog(QDialog):
         _show_ffmpeg_manual_dialog(self)
 
     def _show_clt_notice(self):
-        """コマンドラインツールの導入を促したことを、平易な言葉で伝える。"""
+        """コマンドラインツールの導入を促したことを，平易な言葉で伝える。"""
         if _lang == 'ja':
             title = 'あと一歩です'
-            body = ('文字起こしの準備に必要な部品が、このMacにまだありません。\n\n'
+            body = ('文字起こしの準備に必要な部品が，このMacにまだありません。\n\n'
                     'Appleの「コマンドラインツールをインストール」という画面が\n'
                     '出ましたか？ 出ていれば「インストール」を押してください。\n\n'
                     '・Appleが配布している正規のものです\n'
                     '・パスワードの入力は不要です\n'
-                    '・容量が大きいため、10〜20分ほどかかります\n\n'
-                    '終わったら、このアプリをいったん終了して開き直し、\n'
+                    '・容量が大きいため，10〜20分ほどかかります\n\n'
+                    '終わったら，このアプリをいったん終了して開き直し，\n'
                     'もう一度セットアップを実行してください。')
         else:
             title = 'Almost there'
@@ -1128,7 +1128,7 @@ class SetupWorker(QThread):
 
             if sys.platform == 'win32' and self.do_ffmpeg:
                 self.log_line.emit('')
-                self.log_line.emit('⚠ Windowsの場合、PATHを反映するためにPCを再起動してください。')
+                self.log_line.emit('⚠ Windowsの場合，PATHを反映するためにPCを再起動してください。')
             self.finished.emit(True)
         except Exception as e:
             self.log_line.emit(str(e))
@@ -1170,9 +1170,9 @@ def _subtitle_unavailable_msg() -> str:
             "All other features (transcription, cutting, EAF export) work without libass."
         )
     return (
-        "字幕焼き込みには libass を含む ffmpeg が必要ですが、"
+        "字幕焼き込みには libass を含む ffmpeg が必要ですが，"
         "現在の ffmpeg には含まれていません。\n\n"
-        "macOS の場合（Homebrew の標準 ffmpeg は libass を同梱しなくなりました）、"
+        "macOS の場合（Homebrew の標準 ffmpeg は libass を同梱しなくなりました），"
         "homebrew-ffmpeg 版を導入してください（libass は標準で有効）:\n"
         "    brew tap homebrew-ffmpeg/ffmpeg\n"
         "    brew unlink ffmpeg\n"
@@ -2221,18 +2221,18 @@ class BatchDialog(QDialog):
         cfg.addWidget(self.cmb_fill_mode)
         cfg.addSpacing(12)
         self.chk_txt = QCheckBox('TXTでも書き出す' if _lang == 'ja' else 'Also export TXT')
-        self.chk_txt.setToolTip('SRTに加えて、時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です' if _lang == 'ja'
+        self.chk_txt.setToolTip('SRTに加えて，時間つきテキスト形式（.txt）でも保存する\n議事録作成やAIへの入力に便利です' if _lang == 'ja'
                                 else 'Save a timestamped plain-text (.txt) file alongside the SRT\nHandy for meeting minutes or feeding into AI tools')
         self.chk_txt.setChecked(self._default_export_txt)
         cfg.addWidget(self.chk_txt)
         self.chk_csv = QCheckBox('CSVでも書き出す' if _lang == 'ja' else 'Also export CSV')
-        self.chk_csv.setToolTip('SRTに加えて、開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です' if _lang == 'ja'
+        self.chk_csv.setToolTip('SRTに加えて，開始・終了・テキストを列に分けたCSVでも保存する\nExcelで開いてコーディング・分析するのに便利です' if _lang == 'ja'
                                 else 'Save a CSV (start/end/text columns) alongside the SRT\nHandy for coding and analysis in Excel')
         self.chk_csv.setChecked(self._default_export_csv)
         cfg.addWidget(self.chk_csv)
         self.chk_silent_rec = QCheckBox('無音が多い録音' if _lang == 'ja' else 'Silent-heavy recording')
         self.chk_silent_rec.setToolTip(
-            '作業記録・観察記録など、長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。'
+            '作業記録・観察記録など，長い無音が多い録音向け。\n単語単位の時刻付けと幻聴抑制を有効にします（処理時間1〜2割増）。'
             if _lang == 'ja' else
             'For recordings with long silences (task observation, fieldwork, etc.).\nEnables word-level timestamps and hallucination suppression (~10–20% slower).')
         self.chk_silent_rec.setChecked(self._default_silent_recording)
@@ -2607,7 +2607,7 @@ class FillerCutDialog(QDialog):
     @staticmethod
     def _normalize(text: str) -> str:
         """句読点・空白を除去して比較用テキストを返す"""
-        return text.strip().rstrip('、。，．,. \t　')
+        return text.strip().rstrip('，。，．,. \t　')
 
     def _apply(self):
         fillers = {line.strip() for line in
@@ -3864,13 +3864,13 @@ class MainWindow(QMainWindow):
         self.lbl_preset = QLabel('初期設定:' if _lang == 'ja' else 'Preset:')
         self.btn_preset_research = QPushButton('🔬 研究用' if _lang == 'ja' else '🔬 Research')
         self.btn_preset_research.setToolTip(
-            '会話分析・質的研究向け: しきつめ・[間]の記録をON、字幕焼き込みをOFFにします'
+            '会話分析・質的研究向け: しきつめ・[間]の記録をON，字幕焼き込みをOFFにします'
             if _lang == 'ja' else
             'For conversation/qualitative analysis: turns on gap-filling and [Pause] recording, turns off subtitle burn-in')
         self.btn_preset_research.clicked.connect(self._apply_preset_research)
         self.btn_preset_video = QPushButton('🎬 動画用' if _lang == 'ja' else '🎬 Video')
         self.btn_preset_video.setToolTip(
-            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF、字幕焼き込みをONにします'
+            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF，字幕焼き込みをONにします'
             if _lang == 'ja' else
             'For video content production: turns off gap-filling and [Pause] recording, turns on subtitle burn-in')
         self.btn_preset_video.clicked.connect(self._apply_preset_video)
@@ -4196,12 +4196,12 @@ class MainWindow(QMainWindow):
         self.lbl_preset.setText('初期設定:' if _lang == 'ja' else 'Preset:')
         self.btn_preset_research.setText('🔬 研究用' if _lang == 'ja' else '🔬 Research')
         self.btn_preset_research.setToolTip(
-            '会話分析・質的研究向け: しきつめ・[間]の記録をON、字幕焼き込みをOFFにします'
+            '会話分析・質的研究向け: しきつめ・[間]の記録をON，字幕焼き込みをOFFにします'
             if _lang == 'ja' else
             'For conversation/qualitative analysis: turns on gap-filling and [Pause] recording, turns off subtitle burn-in')
         self.btn_preset_video.setText('🎬 動画用' if _lang == 'ja' else '🎬 Video')
         self.btn_preset_video.setToolTip(
-            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF、字幕焼き込みをONにします'
+            '動画コンテンツ制作向け: しきつめ・[間]の記録をOFF，字幕焼き込みをONにします'
             if _lang == 'ja' else
             'For video content production: turns off gap-filling and [Pause] recording, turns on subtitle burn-in')
         self.drop_zone.setText(tr('drop_hint'))
