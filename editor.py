@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.8"
+APP_VERSION = "1.2.9"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -375,11 +375,20 @@ def _child_env() -> dict:
     そのため同梱先を PATH の先頭に加える。
     """
     env = os.environ.copy()
-    if sys.platform != 'win32':
-        extra = ['/usr/local/bin', '/opt/homebrew/bin']
-        own = _bundled_ffmpeg_path().parent
-        if own.is_dir():
-            extra.insert(0, str(own))   # 同梱版を最優先
+    extra = []
+    own = _bundled_ffmpeg_path().parent
+    if own.is_dir():
+        extra.append(str(own))          # 同梱版を最優先
+    if sys.platform == 'win32':
+        # Windows も同様。_find_ffmpeg は C:\ffmpeg\bin などを直接見に行くが，
+        # whisper 側は PATH しか見ないため，見つけた場所を渡す必要がある。
+        d = os.path.dirname(FFMPEG_BIN)
+        if d and os.path.isdir(d):
+            extra.append(d)
+        if extra:
+            env['PATH'] = os.pathsep.join(extra) + os.pathsep + env.get('PATH', '')
+    else:
+        extra += ['/usr/local/bin', '/opt/homebrew/bin']
         env['PATH'] = ':'.join(extra) + ':' + env.get('PATH', '')
     return env
 
@@ -423,10 +432,13 @@ def _ffmpeg_has_libass(path: str) -> bool:
     （警告を出すのは確証があるときだけにする）。
     """
     try:
-        out = subprocess.run([path, '-version'], capture_output=True, text=True,
-                             timeout=10).stdout
+        r = subprocess.run([path, '-version'], capture_output=True, text=True,
+                           timeout=10)
     except Exception:
         return True
+    if r.returncode != 0:
+        return True          # 起動できない件は _is_ffmpeg_ok の担当
+    out = r.stdout or ''
     return ('--enable-libass' in out) if 'configuration:' in out else True
 
 
@@ -482,6 +494,20 @@ def _install_ffmpeg_macos(log=lambda s: None, progress=lambda p: None) -> str:
     # ダウンロード物には検疫属性が付き、初回実行が拒否されるため落とす
     subprocess.run(['xattr', '-dr', 'com.apple.quarantine', str(dest)],
                    capture_output=True)
+
+    # 置いただけで終わらせない。起動できないバイナリを残すと _find_ffmpeg が
+    # それを最優先で拾い続け、再セットアップもできない行き止まりになる。
+    try:
+        r = subprocess.run([str(dest), '-version'], capture_output=True,
+                           text=True, timeout=20)
+        ok = (r.returncode == 0 and 'ffmpeg version' in (r.stdout or ''))
+    except Exception:
+        ok = False
+    if not ok:
+        dest.unlink(missing_ok=True)      # 居座らせない
+        raise RuntimeError('取得した ffmpeg を実行できませんでした。'
+                           'お使いの macOS では動作しない可能性があります。')
+
     log(f'ffmpeg を配置しました: {dest}')
     return str(dest)
 
@@ -568,7 +594,8 @@ def _find_whisper() -> str:
                 return str(w_base)
         # `pip install --user` の入る先。conda を使っていない素のMacではここ。
         # GUI起動のアプリは PATH が最小限なので shutil.which では拾えない。
-        hits = sorted(Path.home().glob('Library/Python/3.*/bin/whisper'))
+        hits = sorted(Path.home().glob('Library/Python/3.*/bin/whisper'),
+                   key=lambda p: _ver_key(p.parent.parent.name))
         if hits:
             return str(hits[-1])
     return 'whisper'
@@ -593,7 +620,8 @@ def _find_mlx_whisper() -> str:
         if w_base.exists():
             return str(w_base)
     # `pip install --user` の入る先（conda を使っていない素のMac）
-    hits = sorted(Path.home().glob('Library/Python/3.*/bin/mlx_whisper'))
+    hits = sorted(Path.home().glob('Library/Python/3.*/bin/mlx_whisper'),
+                   key=lambda p: _ver_key(p.parent.parent.name))
     if hits:
         return str(hits[-1])
     return ''
@@ -604,6 +632,21 @@ WHISPER_BIN = _find_whisper()
 # ── 音声認識エンジン（Mac: mlx-whisper で Metal GPU / それ以外: openai-whisper） ──
 _IS_APPLE_SILICON = (sys.platform == 'darwin' and platform.machine() == 'arm64')
 MLX_WHISPER_BIN   = _find_mlx_whisper() if _IS_APPLE_SILICON else ''
+
+
+def _refresh_tool_paths() -> None:
+    """外部ツールの場所を探し直す。インストール後は必ずこれを呼ぶ。
+
+    以前は _on_done が WHISPER_BIN と FFMPEG_BIN だけを更新しており，
+    MLX_WHISPER_BIN が 606 行の初期化以降ずっと更新されなかった。
+    その結果 Apple Silicon では mlx-whisper の導入に成功しても
+    そのセッション中は「未インストール」のままだった。
+    更新漏れが再発しないよう，3つまとめてここで扱う。
+    """
+    global FFMPEG_BIN, WHISPER_BIN, MLX_WHISPER_BIN
+    FFMPEG_BIN      = _find_ffmpeg()
+    WHISPER_BIN     = _find_whisper()
+    MLX_WHISPER_BIN = _find_mlx_whisper() if _IS_APPLE_SILICON else ''
 
 # UIのモデル名 → mlx-community の HF リポジトリ名（無いものは openai-whisper にフォールバック）
 _MLX_MODELS = {
@@ -633,6 +676,44 @@ def _real_python_on_path() -> str:
         except Exception:
             continue
     return ''
+
+def _python_on_disk() -> str:
+    """PATH に頼らず，よくある場所から実行可能な python3 を探す。
+
+    Finder から起動した .app の PATH は /usr/bin:/bin:/usr/sbin:/sbin しか
+    無いため，python.org 版も Homebrew 版も conda も shutil.which では拾えない。
+    これを見ずに「Python が無い」と判断すると，Python を持っている人にまで
+    数GBの Xcode コマンドラインツールを取らせてしまう。
+    """
+    cands = []
+    for p in ('/usr/local/bin/python3', '/opt/homebrew/bin/python3'):
+        cands.append(Path(p))
+    cands += sorted(Path('/Library/Frameworks/Python.framework/Versions').glob('3.*/bin/python3'),
+                    key=lambda p: _ver_key(p.parent.parent.name), reverse=True)
+    for base in ('/opt/anaconda3', '/opt/miniconda3', '~/anaconda3', '~/miniconda3',
+                 '~/miniforge3', '~/mambaforge'):
+        cands.append(Path(os.path.expanduser(base)) / 'bin' / 'python3')
+    for c in cands:
+        try:
+            if c.is_file() and subprocess.run([str(c), '--version'], capture_output=True,
+                                              timeout=10).returncode == 0:
+                return str(c)
+        except Exception:
+            continue
+    return ''
+
+
+def _ver_key(name: str):
+    """'3.9' < '3.10' となるようにバージョン文字列を数値で比較する。
+
+    sorted() の既定は文字列比較で '3.9' > '3.10' となり，古い方を
+    最新と誤判定する。
+    """
+    try:
+        return tuple(int(x) for x in name.split('.'))
+    except Exception:
+        return (0,)
+
 
 def _macos_clt_installed() -> bool:
     """Xcodeコマンドラインツールが入っているか。macOS の python3 はこれが無いと
@@ -816,9 +897,11 @@ def _unique_path(path: str) -> str:
 
 
 def _is_ffmpeg_ok() -> bool:
+    # returncode を見ないと、起動できない壊れたバイナリまで合格にしてしまう。
     try:
-        subprocess.run([FFMPEG_BIN, '-version'], capture_output=True, timeout=5)
-        return True
+        r = subprocess.run([FFMPEG_BIN, '-version'], capture_output=True,
+                           text=True, timeout=10)
+        return r.returncode == 0 and 'ffmpeg version' in (r.stdout or '')
     except Exception:
         return False
 
@@ -1034,11 +1117,12 @@ class SetupDialog(QDialog):
     def _on_done(self, success: bool):
         self.progress.setVisible(False)
         self.btn_skip.setEnabled(True)
+        # 再探索は成否に関わらず必ず行う。
+        # 「ffmpeg は入ったが Python が無くて中断」のような部分成功があり，
+        # if success: の中に置くと FFMPEG_BIN が 'ffmpeg' のまま残って
+        # 書き出し時に FileNotFoundError でアプリごと落ちる。
+        _refresh_tool_paths()
         if success:
-            # インストール後にWHISPER_BIN/FFMPEG_BINを再評価
-            global WHISPER_BIN, FFMPEG_BIN
-            WHISPER_BIN = _find_whisper()
-            FFMPEG_BIN  = _find_ffmpeg()
             if sys.platform == 'win32':
                 msg = 'インストール完了！PCを再起動してからアプリを起動してください。' if _lang == 'ja' else 'Installation complete! Please restart your PC, then launch the app again.'
             else:
@@ -1147,6 +1231,12 @@ class SetupWorker(QThread):
                 if sys.platform != 'win32':
                     py = _pip_python()   # win32は上のブロックで解決済みのpyを使う（上書きしない）
 
+                # PATH に無くてもディスク上に Python があることは多い。
+                # Finder 起動の .app は PATH が最小限なので，ここを見ないと
+                # Python を持っている人にまで数GBの Xcode を取らせてしまう。
+                if not py and sys.platform != 'win32':
+                    py = _python_on_disk()
+
                 # 素のMacには使えるPythonが無い。/usr/bin/python3 はコマンドライン
                 # ツール未導入だと実体がなく、実行してもインストーラを出すだけ。
                 if not py and sys.platform == 'darwin' and not _macos_clt_installed():
@@ -1177,8 +1267,21 @@ class SetupWorker(QThread):
             if sys.platform == 'win32' and self.do_ffmpeg:
                 self.log_line.emit('')
                 self.log_line.emit('⚠ Windowsの場合，PATHを反映するためにPCを再起動してください。')
-            # ffmpeg が入っていないのに「完了」と出すと利用者を混乱させる
-            self.finished.emit(not self._ffmpeg_failed)
+            # 終了コードだけで判定すると winget の「既に導入済み」などで誤検知する。
+            # 実際に見つかるかどうかを最終的な根拠にする。
+            # pip も winget も戻り値を見ていなかったため，何が失敗しても
+            # 「インストール完了！」と出て，再起動しても同じ画面に戻る往復に
+            # なっていた。
+            _refresh_tool_paths()
+            ok = True
+            if self.do_ffmpeg and not _is_ffmpeg_ok():
+                ok = False
+                self.log_line.emit('ffmpeg を用意できませんでした。')
+            if self.do_whisper and not _is_whisper_ok():
+                ok = False
+                self.log_line.emit('Whisper を用意できませんでした。'
+                                   '上のログにエラーの内容が出ています。')
+            self.finished.emit(ok and not self._ffmpeg_failed)
         except Exception as e:
             self.log_line.emit(str(e))
             self.finished.emit(False)
@@ -2226,9 +2329,11 @@ class BatchDialog(QDialog):
         for m in self._models:
             self.cmb_model.addItem(_model_item_text(m, cached, rec_model))
         # デフォルトモデルを選択
+        # 部分一致だと 'large-v3' が 'large-v3-turbo ◀ 推奨' に引っかかり、
+        # メイン画面で選んだモデルが黙ってすり替わる。モデル名で完全一致させる。
         stem = self._default_model
         for i in range(self.cmb_model.count()):
-            if stem in self.cmb_model.itemText(i):
+            if _model_name_of(self.cmb_model.itemText(i)) == stem:
                 self.cmb_model.setCurrentIndex(i)
                 break
         cfg.addWidget(self.cmb_model)
@@ -2650,7 +2755,10 @@ class FillerCutDialog(QDialog):
     @staticmethod
     def _normalize(text: str) -> str:
         """句読点・空白を除去して比較用テキストを返す"""
-        return text.strip().rstrip('，。，．,. \t　')
+        # ここは表示文言ではなく「除去する文字の集合」。読点の表記統一で
+        # 「、」を「，」に置換してしまい，日本語の読点で終わる語を正規化
+        # できなくなっていた。両方を含める。
+        return text.strip().rstrip('、，。．,. \t　')
 
     def _apply(self):
         fillers = {line.strip() for line in
@@ -5254,7 +5362,11 @@ def main():
             st = QSettings('EasyTranscribe', 'EasyTranscribe')
             if not st.value('mlx_upgrade_offered', False, type=bool):
                 SetupDialog(False, True, upgrade=True).exec()
-                st.setValue('mlx_upgrade_offered', True)
+                # 導入できた時だけ既読にする。失敗やスキップで既読にすると、
+                # 準備を整えて再起動しても二度と案内されず、CPU版のまま残る。
+                _refresh_tool_paths()
+                if MLX_WHISPER_BIN:
+                    st.setValue('mlx_upgrade_offered', True)
         _show_main()
 
     splash.finished.connect(_after_splash)
