@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.10"
+APP_VERSION = "1.2.11"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -512,6 +512,22 @@ def _install_ffmpeg_macos(log=lambda s: None, progress=lambda p: None) -> str:
     return str(dest)
 
 
+def _ver_key(name: str):
+    """'3.9' < '3.10' となるようにバージョン文字列を数値で比較する。
+
+    sorted() の既定は文字列比較で '3.9' > '3.10' となり，古い方を
+    最新と誤判定する。
+
+    注意: この関数は _find_whisper / _find_mlx_whisper から使われ，
+    それらはモジュール読み込み時に実行される。定義位置を下げると
+    NameError でアプリが起動しなくなるため，ここより後ろに移さないこと。
+    """
+    try:
+        return tuple(int(x) for x in name.split('.'))
+    except Exception:
+        return (0,)
+
+
 def _find_ffmpeg() -> str:
     # セットアップで入れた専用ビルドを最優先（libass 入りが保証されるため）
     own = _bundled_ffmpeg_path()
@@ -701,18 +717,6 @@ def _python_on_disk() -> str:
         except Exception:
             continue
     return ''
-
-
-def _ver_key(name: str):
-    """'3.9' < '3.10' となるようにバージョン文字列を数値で比較する。
-
-    sorted() の既定は文字列比較で '3.9' > '3.10' となり，古い方を
-    最新と誤判定する。
-    """
-    try:
-        return tuple(int(x) for x in name.split('.'))
-    except Exception:
-        return (0,)
 
 
 def _macos_clt_installed() -> bool:
