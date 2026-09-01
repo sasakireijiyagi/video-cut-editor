@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.9"
+APP_VERSION = "1.2.10"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -736,9 +736,30 @@ def _request_macos_clt() -> None:
 
 
 def _needs_user_flag(py: str) -> bool:
-    """システム付属の Python なら `pip install --user` が要る。
-    システム領域には書き込めず、権限昇格なしでは失敗するため。"""
-    return py.startswith('/usr/bin/') or py.startswith('/System/')
+    """`pip install --user` を付けるべき Python か判定する。
+
+    パスの前方一致では足りない。Homebrew の Python 3.11 以降や
+    Debian 系は PEP 668 の EXTERNALLY-MANAGED を持ち，--user 無しの
+    pip install が「externally-managed-environment」で拒否される。
+    conda の base 環境も直接入れると依存が壊れやすい。
+    書けるかどうかを実際に問い合わせる。
+    """
+    if py.startswith('/usr/bin/') or py.startswith('/System/'):
+        return True
+    try:
+        r = subprocess.run(
+            [py, '-c',
+             'import sysconfig,os,sys;'
+             'p=sysconfig.get_paths()["stdlib"];'
+             'print(os.path.exists(os.path.join(p,"EXTERNALLY-MANAGED")))'],
+            capture_output=True, text=True, timeout=15)
+        if r.returncode == 0 and 'True' in (r.stdout or ''):
+            return True          # PEP 668 で保護されている
+    except Exception:
+        pass
+    # venv / conda env の中なら書けるので --user は不要。
+    # base 環境や不明な場合は安全側に倒して --user を付ける。
+    return os.environ.get('VIRTUAL_ENV') is None and 'envs' not in py
 
 
 def _pip_python() -> str:
@@ -1274,7 +1295,13 @@ class SetupWorker(QThread):
             # なっていた。
             _refresh_tool_paths()
             ok = True
-            if self.do_ffmpeg and not _is_ffmpeg_ok():
+            # Windows の ffmpeg はここで検査しない。winget の導入先は
+            # %LOCALAPPDATA%\Microsoft\WinGet\Packages\... で _find_ffmpeg の
+            # 候補に無く，PATH も実行中プロセスには反映されないため，
+            # 成功していても必ず「見つからない」と判定されてしまう。
+            # 反映には再起動が要る旨を下で案内している。
+            check_ffmpeg = self.do_ffmpeg and sys.platform != 'win32'
+            if check_ffmpeg and not _is_ffmpeg_ok():
                 ok = False
                 self.log_line.emit('ffmpeg を用意できませんでした。')
             if self.do_whisper and not _is_whisper_ok():
