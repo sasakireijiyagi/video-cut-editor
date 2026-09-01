@@ -13,7 +13,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.7"
+APP_VERSION = "1.2.8"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -364,6 +364,24 @@ _FFMPEG_BUILDS = {
     'x86_64': {'url': 'https://www.osxexperts.net/ffmpeg80intel.zip',
                'sha256': 'df3f1e3facdc1ae0ad0bd898cdfb072fbc9641bf47b11f172844525a05db8d11'},
 }
+
+
+def _child_env() -> dict:
+    """whisper などの子プロセスに渡す環境変数。
+
+    whisper は自前で `ffmpeg` を PATH から呼ぶ。アプリ本体は絶対パスで
+    呼ぶので気づけないが，同梱した ffmpeg を Application Support に置くと
+    PATH に無く，whisper 側だけが FileNotFoundError で落ちる。
+    そのため同梱先を PATH の先頭に加える。
+    """
+    env = os.environ.copy()
+    if sys.platform != 'win32':
+        extra = ['/usr/local/bin', '/opt/homebrew/bin']
+        own = _bundled_ffmpeg_path().parent
+        if own.is_dir():
+            extra.insert(0, str(own))   # 同梱版を最優先
+        env['PATH'] = ':'.join(extra) + ':' + env.get('PATH', '')
+    return env
 
 
 def _ssl_context():
@@ -1173,9 +1191,7 @@ def _ffmpeg_has_subtitles() -> bool:
     if _SUBTITLES_FILTER_CACHE is not None:
         return _SUBTITLES_FILTER_CACHE
     try:
-        env = os.environ.copy()
-        if sys.platform != 'win32':
-            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        env = _child_env()
         r = subprocess.run([FFMPEG_BIN, '-hide_banner', '-filters'],
                            capture_output=True, text=True, timeout=15, env=env)
         # "subtitles" フィルタ行を探す（行頭フラグの後にフィルタ名が来る）
@@ -1805,9 +1821,7 @@ class WhisperWorker(QThread):
                       if _lang == 'ja' else
                       'Loading model… (the first run takes 10–30 seconds)')
 
-        env = os.environ.copy()
-        if sys.platform != 'win32':
-            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        env = _child_env()
         env['PYTHONUNBUFFERED'] = '1'   # whisperの進捗をリアルタイム表示（バッファ無効化）
 
         try:
@@ -1978,9 +1992,7 @@ class BatchWhisperWorker(QThread):
 
     def run(self):
         success = 0
-        env     = os.environ.copy()
-        if sys.platform != 'win32':
-            env['PATH'] = '/usr/local/bin:/opt/homebrew/bin:' + env.get('PATH', '')
+        env     = _child_env()
         env['PYTHONUNBUFFERED'] = '1'   # whisperの進捗をリアルタイム表示（バッファ無効化）
 
         i = 0
