@@ -247,7 +247,10 @@ if os.name != 'nt':   # Windows の chmod はフォルダへの書き込みを�
     try:
         r = run_single(str(sub / '会議.mp4'))
     finally:
-        os.environ['HOME'] = _home
+        if _home is None:
+            os.environ.pop('HOME', None)   # Windows では未設定が普通
+        else:
+            os.environ['HOME'] = _home
         os.chmod(sub, 0o755)
     check('読取専用: 失敗と報告', r.get('ok') is False)
     check('読取専用: 既存SRTが無傷（退避もされない）',
@@ -275,7 +278,10 @@ try:
 except Exception:
     escaped = True
 finally:
-    os.environ['HOME'] = _home
+    if _home is None:
+        os.environ.pop('HOME', None)   # Windows では未設定が普通
+    else:
+        os.environ['HOME'] = _home
 check('超長名: 例外がワーカーの外へ抜けない', not escaped)
 check('超長名: 失敗と報告', not escaped and r.get('ok') is False)
 check('超長名: 既存SRTが無傷',
