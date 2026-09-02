@@ -266,26 +266,29 @@ else:
 # (9) 幹が極端に長い名前（退避名だけが上限を超える）:
 #     例外がワーカーの外へ抜けてアプリごと落ちないこと
 if os.name == 'nt':
+    # 幹を縮めると「普通に成功する」だけのシナリオになり検査が成立しない。
+    # Windows のパス長は MAX_PATH という別問題なので，この検査ごとスキップする
     print('  --  超長名の検査は POSIX のみ（Windows は MAX_PATH の別問題になるため）')
-long_stem = 'x' * 250 if os.name != 'nt' else 'x' * 60
-reset({long_stem + '.mov': 'd', long_stem + '.srt': '編集した逐語録'})
-setup_engine(long_stem + '.srt')
-_home = os.environ.get('HOME')
-os.environ['HOME'] = str(fake_home)
-try:
-    r = run_single(str(work / (long_stem + '.mov')))
-    escaped = False
-except Exception:
-    escaped = True
-finally:
-    if _home is None:
-        os.environ.pop('HOME', None)   # Windows では未設定が普通
-    else:
-        os.environ['HOME'] = _home
-check('超長名: 例外がワーカーの外へ抜けない', not escaped)
-check('超長名: 失敗と報告', not escaped and r.get('ok') is False)
-check('超長名: 既存SRTが無傷',
-      (work / (long_stem + '.srt')).read_text(encoding='utf-8') == '編集した逐語録')
+else:
+    long_stem = 'x' * 250
+    reset({long_stem + '.mov': 'd', long_stem + '.srt': '編集した逐語録'})
+    setup_engine(long_stem + '.srt')
+    _home = os.environ.get('HOME')
+    os.environ['HOME'] = str(fake_home)
+    try:
+        r = run_single(str(work / (long_stem + '.mov')))
+        escaped = False
+    except Exception:
+        escaped = True
+    finally:
+        if _home is None:
+            os.environ.pop('HOME', None)
+        else:
+            os.environ['HOME'] = _home
+    check('超長名: 例外がワーカーの外へ抜けない', not escaped)
+    check('超長名: 失敗と報告', not escaped and r.get('ok') is False)
+    check('超長名: 既存SRTが無傷',
+          (work / (long_stem + '.srt')).read_text(encoding='utf-8') == '編集した逐語録')
 
 # (10) 退避が「一部だけ」失敗（CSVがロック中＝Excelで開いたまま等）:
 #      退避済みのSRTを巻き戻し，利用者のファイルを元のままにすること
