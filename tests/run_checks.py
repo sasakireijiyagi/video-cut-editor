@@ -70,7 +70,7 @@ if sys.platform == 'darwin':
     with tempfile.TemporaryDirectory() as fake_home:
       bindir = Path(fake_home) / 'Library' / 'Python' / '3.11' / 'bin'
       bindir.mkdir(parents=True)
-      (bindir / 'whisper').write_text('#!/bin/sh\n')
+      (bindir / 'whisper').write_text('#!/bin/sh\n', encoding='utf-8')
       (bindir / 'whisper').chmod(0o755)
       r = subprocess.run(
           [sys.executable, '-c',
@@ -140,7 +140,7 @@ def reset(files):
         if p.is_file() and p != FAKE:
             p.unlink()
     for name, content in files.items():
-        (work / name).write_text(content)
+        (work / name).write_text(content, encoding='utf-8')
 
 
 V = 'Screen Recording 2026-01-15 at 09.30.00.mov'   # macOS 画面収録の既定名
@@ -154,15 +154,15 @@ setup_engine(T)
 r = run_single(str(work / V))
 bak = list(work.glob('*backup*'))
 check('ドット入り名: 正規名に出力される',
-      r.get('ok') and (work / S).read_text().startswith('1'))
+      r.get('ok') and (work / S).read_text(encoding='utf-8').startswith('1'))
 check('ドット入り名: 編集済みSRTが退避される',
-      bak and '編集した逐語録' in bak[0].read_text())
+      bak and '編集した逐語録' in bak[0].read_text(encoding='utf-8'))
 
 # (2) 旧版の遺産（切り詰め名に編集済みSRT）を壊さないこと
 reset({V: 'd', T: '旧版時代の逐語録'})
 setup_engine(T)
 r = run_single(str(work / V))
-check('切り詰め名の遺産が無傷', (work / T).read_text() == '旧版時代の逐語録')
+check('切り詰め名の遺産が無傷', (work / T).read_text(encoding='utf-8') == '旧版時代の逐語録')
 check('新出力は正規名', (work / S).exists())
 
 # (3) 中止(rc≠0): 利用者のフォルダに一切触れないこと
@@ -171,7 +171,7 @@ setup_engine(T, rc=143)
 r = run_single(str(work / V))
 check('中止: 失敗と報告', r.get('ok') is False)
 check('中止: 既存SRTが無傷（退避もされない）',
-      (work / S).read_text() == '編集した逐語録'
+      (work / S).read_text(encoding='utf-8') == '編集した逐語録'
       and not list(work.glob('*backup*')))
 
 # (4) mlx が何も出さず exit 0（ファイル単位の例外を握りつぶす挙動）:
@@ -180,13 +180,13 @@ reset({V: 'd', S: '編集した逐語録'})
 setup_engine(None, rc=0)
 r = run_single(str(work / V))
 check('無出力 exit0: 失敗と報告', r.get('ok') is False)
-check('無出力 exit0: 既存SRTが無傷', (work / S).read_text() == '編集した逐語録')
+check('無出力 exit0: 既存SRTが無傷', (work / S).read_text(encoding='utf-8') == '編集した逐語録')
 
 # (5) 隣の動画のSRTを掴まないこと（a.mp4 の a.srt がある所で a.b.mp4 を処理）
 reset({'a.mp4': 'd', 'a.srt': 'a.mp4の逐語録', 'a.b.mp4': 'd'})
 setup_engine('a.srt')   # mlx は a.b → a に切り詰める
 r = run_single(str(work / 'a.b.mp4'))
-check('隣接動画のSRTが無傷', (work / 'a.srt').read_text() == 'a.mp4の逐語録')
+check('隣接動画のSRTが無傷', (work / 'a.srt').read_text(encoding='utf-8') == 'a.mp4の逐語録')
 check('出力は a.b.srt', (work / 'a.b.srt').exists())
 
 # (6) 書き出しOFFの .txt/.csv を退避しないこと（CSVはコーディング成果物）
@@ -194,8 +194,8 @@ reset({'会議.mp4': 'd', '会議.srt': '編集済み',
        '会議.csv': 'コーディング済み', '会議.txt': 'メモ'})
 setup_engine('会議.srt')
 r = run_single(str(work / '会議.mp4'))
-check('書き出しOFFのCSVが無傷', (work / '会議.csv').read_text() == 'コーディング済み')
-check('書き出しOFFのTXTが無傷', (work / '会議.txt').read_text() == 'メモ')
+check('書き出しOFFのCSVが無傷', (work / '会議.csv').read_text(encoding='utf-8') == 'コーディング済み')
+check('書き出しOFFのTXTが無傷', (work / '会議.txt').read_text(encoding='utf-8') == 'メモ')
 
 # (7) 退避が効かない環境でもフェイルクローズすること:
 #     退避が空振りしたら上書きせず，今回の結果は .new.srt として残す
@@ -208,10 +208,10 @@ try:
 finally:
     m._backup_existing_outputs = _orig_backup
 check('退避不能: 失敗と報告（成功と偽らない）', r.get('ok') is False)
-check('退避不能: 編集済みSRTが無傷', (work / '会議.srt').read_text() == '編集した逐語録')
+check('退避不能: 編集済みSRTが無傷', (work / '会議.srt').read_text(encoding='utf-8') == '編集した逐語録')
 news = list(work.glob('*.new*.srt'))
 check('退避不能: 今回の結果は .new.srt として残る',
-      news and news[0].read_text().startswith('1'))
+      news and news[0].read_text(encoding='utf-8').startswith('1'))
 check('退避不能: 文言が上書き中止を説明', '上書きを中止' in r.get('msg', ''))
 
 # (7b) 巻き戻せなかったものがあるとき「元のまま」と言わないこと（文言の整合）
@@ -237,8 +237,8 @@ fake_home = work / 'fakehome2'
 (fake_home / 'Desktop').mkdir(parents=True, exist_ok=True)
 sub = work / 'rodir'
 sub.mkdir(exist_ok=True)
-(sub / '会議.mp4').write_text('d')
-(sub / '会議.srt').write_text('編集した逐語録')
+(sub / '会議.mp4').write_text('d', encoding='utf-8')
+(sub / '会議.srt').write_text('編集した逐語録', encoding='utf-8')
 setup_engine('会議.srt')
 if os.name != 'nt':   # Windows の chmod はフォルダへの書き込みを防げない
     os.chmod(sub, 0o555)
@@ -251,11 +251,11 @@ if os.name != 'nt':   # Windows の chmod はフォルダへの書き込みを�
         os.chmod(sub, 0o755)
     check('読取専用: 失敗と報告', r.get('ok') is False)
     check('読取専用: 既存SRTが無傷（退避もされない）',
-          (sub / '会議.srt').read_text() == '編集した逐語録'
+          (sub / '会議.srt').read_text(encoding='utf-8') == '編集した逐語録'
           and not list(sub.glob('*backup*')))
     salvaged = list((fake_home / 'Desktop').glob('*.srt'))
     check('読取専用: 完成品をデスクトップへ救い出す',
-          salvaged and salvaged[0].read_text().startswith('1'))
+          salvaged and salvaged[0].read_text(encoding='utf-8').startswith('1'))
     check('読取専用: 救い出し先を文言で知らせる', '保存しました' in r.get('msg', ''))
 else:
     print('  --  読取専用フォルダの検査は POSIX のみ')
@@ -279,7 +279,7 @@ finally:
 check('超長名: 例外がワーカーの外へ抜けない', not escaped)
 check('超長名: 失敗と報告', not escaped and r.get('ok') is False)
 check('超長名: 既存SRTが無傷',
-      (work / (long_stem + '.srt')).read_text() == '編集した逐語録')
+      (work / (long_stem + '.srt')).read_text(encoding='utf-8') == '編集した逐語録')
 
 # (10) 退避が「一部だけ」失敗（CSVがロック中＝Excelで開いたまま等）:
 #      退避済みのSRTを巻き戻し，利用者のファイルを元のままにすること
@@ -298,11 +298,11 @@ if sys.platform == 'darwin':
         subprocess.run(['chflags', 'nouchg', str(work / '会議.csv')])
     check('部分退避失敗: 失敗と報告', r.get('ok') is False)
     check('部分退避失敗: SRTが元の名前・元の内容に巻き戻る',
-          (work / '会議.srt').read_text() == '編集した逐語録')
+          (work / '会議.srt').read_text(encoding='utf-8') == '編集した逐語録')
     check('部分退避失敗: 退避の残骸(.backup)が残らない',
           not list(work.glob('会議.backup*')))
     check('部分退避失敗: 今回の結果は .new.srt に保全',
-          any(p.read_text().startswith('1') for p in work.glob('会議.new*.srt')))
+          any(p.read_text(encoding='utf-8').startswith('1') for p in work.glob('会議.new*.srt')))
     check('部分退避失敗: 文言が原因のファイルを実名で挙げる',
           '会議.csv' in r.get('msg', ''))
 else:
@@ -324,9 +324,9 @@ finally:
     os.replace = _orig_replace
 check('確定失敗: 失敗と報告', r.get('ok') is False)
 check('確定失敗: SRTが元の名前・元の内容に巻き戻る',
-      (work / '会議.srt').read_text() == '編集した逐語録')
+      (work / '会議.srt').read_text(encoding='utf-8') == '編集した逐語録')
 check('確定失敗: 結果は .new.srt に保全',
-      any(p.read_text().startswith('1') for p in work.glob('会議.new*.srt')))
+      any(p.read_text(encoding='utf-8').startswith('1') for p in work.glob('会議.new*.srt')))
 check('確定失敗: .part の残骸が残らない', not list(work.glob('*.part')))
 check('確定失敗: 保全先を文言で知らせる', 'として保存しています' in r.get('msg', ''))
 
@@ -367,7 +367,7 @@ check('一括: 無出力の2本目は失敗', (2, False) in results)
 check('一括: 集計 1/2', ('all', 1, 2) in results)
 check('一括: 既存の編集が退避されている',
       (work / 'ok.backup.srt').exists()
-      and (work / 'ok.backup.srt').read_text() == '既存の編集')
+      and (work / 'ok.backup.srt').read_text(encoding='utf-8') == '既存の編集')
 
 # ─────────────────────────────────────────────────────────────
 os.chdir('/')
