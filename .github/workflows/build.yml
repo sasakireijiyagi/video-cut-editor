@@ -20,6 +20,11 @@ jobs:
         run: |
           pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
 
+      - name: Run regression checks
+        # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
+        # これが Windows 実機（GitHub のランナー）での検証を兼ねる
+        run: python tests/run_checks.py
+
       - name: Build app
         run: |
           pyinstaller \
@@ -67,6 +72,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
+
+      - name: Run regression checks
+        # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
+        # これが Windows 実機（GitHub のランナー）での検証を兼ねる
+        run: python tests/run_checks.py
 
       - name: Build exe
         run: |

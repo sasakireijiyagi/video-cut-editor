@@ -6,6 +6,7 @@
 import sys
 import os
 import shutil
+import tempfile
 import platform
 
 # Intel MacでMetalのシェーダーコンパイルが権限エラーでクラッシュする問題の回避策。
@@ -13,7 +14,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.11"
+APP_VERSION = "1.2.12"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -510,6 +511,293 @@ def _install_ffmpeg_macos(log=lambda s: None, progress=lambda p: None) -> str:
 
     log(f'ffmpeg を配置しました: {dest}')
     return str(dest)
+
+
+def _batch_summary_text(success: int, total: int, failures) -> str:
+    """一括処理の完了ダイアログの本文。
+
+    「3/4」だけでは，どのファイルが失敗しどこに結果があるか分からず，
+    利用者は全件やり直すか .new.srt に気づかないまま進んでしまう。
+    失敗したファイルの実名と理由の1行目を載せる。
+    """
+    if _lang == 'ja':
+        head = f'完了: {success}/{total} ファイル処理しました'
+        if failures:
+            lines = [f'・{name}: {msg.splitlines()[0] if msg else ""}'
+                     for name, msg in failures[:5]]
+            head += '\n\nうまくいかなかったファイル:\n' + '\n'.join(lines)
+            if len(failures) > 5:
+                head += f'\n（ほか {len(failures)-5} 件）'
+    else:
+        head = f'Done: {success}/{total} files processed.'
+        if failures:
+            lines = [f'- {name}: {msg.splitlines()[0] if msg else ""}'
+                     for name, msg in failures[:5]]
+            head += '\n\nFiles that did not finish:\n' + '\n'.join(lines)
+            if len(failures) > 5:
+                head += f'\n(+{len(failures)-5} more)'
+    return head
+
+
+def _spare_name(parent: Path, stem: str) -> Path:
+    """<幹>.new.srt / .new2.srt … の空き名。探索が例外でも必ず1つ返す。"""
+    try:
+        n = 1
+        while True:
+            alt = parent / f'{stem}.new{"" if n == 1 else n}.srt'
+            if not alt.exists():
+                return alt
+            n += 1
+    except Exception:
+        return parent / f'{stem}.new.srt'
+
+
+def _rollback_backups(moved, log=lambda s: None) -> list:
+    """退避（rename）を元に戻す。上書きを中止したときに呼ぶ。
+
+    これを怠ると「上書きを中止しました」と表示しながら，利用者の
+    <幹>.srt が .backup.srt に改名されたまま所在不明になる（4周目の点検で
+    実測された穴）。戻せなかった対だけを返し，呼び出し側が実名で案内する。
+    """
+    remaining = []
+    for bak, orig in reversed(moved):
+        try:
+            if orig.exists():
+                remaining.append((bak, orig))
+                continue
+            bak.rename(orig)
+            log(f'{orig.name} を元に戻しました' if _lang == 'ja'
+                else f'Restored {orig.name}')
+        except Exception:
+            remaining.append((bak, orig))
+    return remaining
+
+
+def _salvage_to_home(src, stem: str):
+    """完成品をデスクトップ（無ければホーム）へ複製して救い出す。
+
+    一時フォルダ（/var/folders/…）の場所を文言で案内しても，非技術者は
+    辿り着けず，OS の掃除や再起動で消える。書き出し先に書けない失敗でも
+    ホーム配下なら別要因なので成功する見込みが高い。
+    """
+    for base in (Path.home() / 'Desktop', Path.home()):
+        try:
+            if not base.is_dir():
+                continue
+            n = 1
+            while True:
+                cand = base / (f'{stem}.srt' if n == 1 else f'{stem}.{n}.srt')
+                if not cand.exists():
+                    break
+                n += 1
+            shutil.copyfile(str(src), str(cand))
+            return cand
+        except Exception:
+            continue
+    return None
+
+
+def _renamed_note(remaining) -> str:
+    """巻き戻せなかった退避の案内文（実名で書く）。"""
+    if not remaining:
+        return ''
+    if _lang == 'ja':
+        lines = [f'{orig.name} は {bak.name} という名前になっています'
+                 for bak, orig in remaining]
+    else:
+        lines = [f'{orig.name} is currently named {bak.name}'
+                 for bak, orig in remaining]
+    return '\n' + '\n'.join(lines)
+
+
+def _claim_whisper_srt(tmpdir: str, video: str, exts, log=lambda s: None):
+    """一時フォルダに出た SRT を，動画の隣の <幹>.srt として確定させる。
+
+    whisper の出力名を推測しないための仕組み。mlx-whisper は出力名を
+    Path(audio).stem に with_suffix('.srt') で作るため，幹の最後のドット以降が
+    切り落とされる（macOS の画面収録の既定名で毎回発生）。空の一時フォルダに
+    出力させ，出てきた物をこちらで置き直すことで名前の食い違いを根本からなくす。
+
+    戻り値は (確定した SRT の Path または None, 利用者向けエラー文 または None)。
+    実際の手順は _claim_steps を参照。ここは「どんな例外もワーカーの外へ
+    漏らさない」ための外壁（QThread から例外が抜けると PyQt6 はアプリごと
+    abort する）。想定外の失敗でも完成品をデスクトップへ救い出してから返す。
+    """
+    tmp = Path(tmpdir)
+    try:
+        hits = sorted(tmp.glob('*.srt'))
+    except Exception:
+        hits = []
+    if not hits:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return None, ('文字起こしの結果が出力されませんでした。上のログをご確認ください'
+                      if _lang == 'ja' else
+                      'No transcript was produced — see the log above')
+    try:
+        return _claim_steps(tmpdir, video, exts, hits, log)
+    except Exception as e:
+        cand = _salvage_to_home(hits[0], Path(video).stem)
+        if cand:
+            where = (f'出来上がった逐語録は {cand} に保存しました'
+                     if _lang == 'ja' else f'The transcript was saved to {cand}')
+        else:
+            where = (f'出来上がった逐語録は次の場所に残っています:\n{hits[0]}'
+                     if _lang == 'ja' else f'The transcript remains at:\n{hits[0]}')
+        return None, ((f'結果の確定中に問題が起きました: {e}\n{where}')
+                      if _lang == 'ja' else
+                      (f'A problem occurred while finalizing: {e}\n{where}'))
+
+
+def _claim_steps(tmpdir: str, video: str, exts, hits, log):
+    """書き込みの本体。3段で行う:
+      1) 結果を <幹>.srt.part として書き出し先ボリュームへ複製
+      2) 既存の <幹>.srt/.txt/.csv を退避し，残っていれば巻き戻して中止
+         （フェイルクローズ）
+      3) os.replace で確定（同一ボリュームなので原子的）
+
+    この順序の理由:
+    - 先に複製するので，書き出し先に書けない環境（容量切れ・権限・
+      ネットワーク共有）では利用者のファイルに一切触れずに失敗する。
+      cross-device の move だと途中で切れた <幹>.srt が残り得るが，
+      .part への複製と os.replace ならそれが起きない。
+    - 退避の成否を確認せずに上書きすると，退避だけが失敗する環境で
+      編集済みの逐語録が「成功」表示のまま消える。退避できなければ書かず，
+      退避済みの分は元の名前へ巻き戻す。今回の結果は <幹>.new.srt として
+      残す（長時間の処理結果を捨てない）。
+    - 完成品の唯一の写しを確保するまで一時フォルダを消さない。
+
+    mlx はファイル単位の例外を握りつぶして exit 0 で終わることがあり，
+    returncode では失敗を検出できない。「一時フォルダが空」がその検出になる。
+    """
+    parent = Path(video).parent
+    stem = Path(video).stem
+    dest = parent / (stem + '.srt')
+    part = parent / (stem + '.srt.part')
+
+    # 1) 書き出し先ボリュームへ複製（copy2 でなく copyfile:
+    #    メタデータ複製は不要で，SMB/exFAT では copystat が余計に失敗する）
+    try:
+        part.unlink(missing_ok=True)
+        shutil.copyfile(str(hits[0]), str(part))
+    except Exception as e:
+        try:
+            part.unlink(missing_ok=True)   # 途中まで書けた .part を残さない
+        except Exception:
+            pass
+        cand = _salvage_to_home(hits[0], stem)
+        if cand:
+            where = (f'出来上がった逐語録は {cand} に保存しました'
+                     if _lang == 'ja' else f'The transcript was saved to {cand}')
+        else:
+            # 一時フォルダは消さない。完成品の唯一の写しだから
+            where = (f'出来上がった逐語録は次の場所に残っています:\n{hits[0]}'
+                     if _lang == 'ja' else f'The transcript remains at:\n{hits[0]}')
+        return None, ((f'この場所に保存できませんでした: {e}\n{where}')
+                      if _lang == 'ja' else
+                      (f'Could not save here: {e}\n{where}'))
+
+    # 2) 退避。1件でも残っていれば，退避済みの分を巻き戻して中止
+    try:
+        moved = _backup_existing_outputs(video, exts, log)
+    except Exception as e:
+        moved = []
+        log(f'退避に失敗しました: {e}' if _lang == 'ja' else f'Backup failed: {e}')
+    leftover = [parent / (stem + ext) for ext in exts
+                if (parent / (stem + ext)).exists()]
+    if leftover:
+        try:
+            alt = _spare_name(parent, stem)
+            part.rename(alt)
+            saved = alt
+        except Exception:
+            saved = part
+        remaining = _rollback_backups(moved, log)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        names = '，'.join(q.name for q in leftover)
+        note = _renamed_note(remaining)
+        # 巻き戻せなかった対があるのに「元のまま」と書くと，直後の改名案内と
+        # 同じ文の中で矛盾する。状態に合わせて言い分ける
+        if _lang == 'ja':
+            state = ('お手元のファイルは元のまま残っています。' if not remaining else
+                     'お手元のファイルは消えていませんが，一部は名前が変わっています。')
+            msg = (f'既存の {names} を退避できなかったため，上書きを中止しました。\n'
+                   f'{state}{note}\n'
+                   f'今回の文字起こし結果は {saved.name} として保存しています')
+        else:
+            state = ('Your files are untouched.' if not remaining else
+                     'Your files are safe, but some have been renamed.')
+            msg = (f'Could not back up existing {names}; overwrite was cancelled.\n'
+                   f'{state}{note}\n'
+                   f"This run's transcript was saved as {saved.name}")
+        return None, msg
+
+    # 3) 確定（同一ボリュームの os.replace＝原子的。切れた形は残らない）
+    try:
+        os.replace(str(part), str(dest))
+    except Exception as e:
+        try:
+            alt = _spare_name(parent, stem)
+            part.rename(alt)
+            saved = alt
+        except Exception:
+            saved = part
+        remaining = _rollback_backups(moved, log)
+        note = _renamed_note(remaining)
+        return None, ((f'結果の書き出しに失敗しました: {e}{note}\n'
+                       f'今回の文字起こし結果は {saved.name} として保存しています')
+                      if _lang == 'ja' else
+                      (f'Could not finalize the result: {e}{note}\n'
+                       f"This run's transcript was saved as {saved.name}"))
+
+    shutil.rmtree(tmpdir, ignore_errors=True)
+    return dest, None
+
+
+def _backup_existing_outputs(video: str, exts, log=lambda s: None) -> list:
+    """文字起こしの出力先に既存ファイルがあれば退避する。
+
+    whisper の出力先（動画と同じ場所の <幹>.srt）は，利用者が編集結果を
+    保存する先と同一。何日もかけて直した逐語録が，モデルを変えて実行し直した
+    だけで素の機械出力に戻り，取り戻す手段が無かった。
+
+    退避名は拡張子を保つ（<幹>.backup.srt）。<幹>.srt.bak のような形にすると
+    「SRTを開く」のファイル選択に出ず，利用者が自力で戻せない。
+
+    exts には「今回の実行が実際に書き出す拡張子」だけを渡すこと。
+    書き出さない .txt/.csv まで退避すると，再生成されないまま
+    消えたように見える（CSVは質的分析のコーディング成果物）。
+
+    呼ぶのは _claim_whisper_srt が結果を置く直前だけ。
+    """
+    stem = Path(video).stem
+    parent = Path(video).parent
+    moved = []
+    for ext in exts:
+        name = stem + ext
+        # 名前の探索(exists)も try の中に置く。幹が極端に長いと退避名だけが
+        # ファイル名長の上限を超え，exists() 自体が ENAMETOOLONG を投げる。
+        # QThread の run から例外が抜けると PyQt6 はアプリごと abort するため，
+        # ここから例外を漏らしてはいけない。
+        try:
+            p = parent / name
+            if not p.exists():
+                continue
+            n = 1
+            while True:
+                bak = parent / f'{stem}.backup{"" if n == 1 else n}{ext}'
+                if not bak.exists():
+                    break
+                n += 1
+            p.rename(bak)
+            moved.append((bak, p))
+            log(f'既存の {p.name} を {bak.name} として退避しました'
+                if _lang == 'ja' else
+                f'Moved existing {p.name} to {bak.name}')
+        except Exception as e:
+            log(f'{name} の退避に失敗しました: {e}'
+                if _lang == 'ja' else
+                f'Could not move {name}: {e}')
+    return moved
 
 
 def _ver_key(name: str):
@@ -1933,7 +2221,10 @@ class WhisperWorker(QThread):
                 p.kill()   # SIGTERMで死ななければ強制終了（ゾンビ化防止）
 
     def run(self):
-        outdir = str(Path(self.video).parent)
+        # whisper には空の一時フォルダに出力させる。動画の隣に直接書かせると，
+        # mlx が幹のドット以降を切り詰めた名前で保存するため，退避や読み込みと
+        # 名前が食い違う。詳細は _claim_whisper_srt を参照。
+        outdir = tempfile.mkdtemp(prefix='easytranscribe-')
 
         # Dropbox等のクラウドファイルなら、まず実体をダウンロード
         if _is_dataless(self.video):
@@ -1969,22 +2260,24 @@ class WhisperWorker(QThread):
                     self.log.emit(line)
             self._proc.wait()
         except Exception as exc:
+            shutil.rmtree(outdir, ignore_errors=True)
             self.done.emit(False, str(exc))
             return
 
         if self._proc.returncode != 0:
+            # 中止した場合もここに来る。一時フォルダを捨てるだけで，
+            # 利用者のファイルには最初から触れていない。
+            shutil.rmtree(outdir, ignore_errors=True)
             self.done.emit(False, f"whisper exited with error (code {self._proc.returncode})")
             return
 
-        stem = Path(self.video).stem
-        outdir_path = Path(outdir)
-        srt = outdir_path / (stem + '.srt')
-        if not srt.exists():
-            hits = sorted(outdir_path.glob('*.srt'), key=lambda p: p.stat().st_mtime, reverse=True)
-            srt = hits[0] if hits else srt
-
-        if not srt.exists():
-            self.done.emit(False, f"SRT not found: {srt}")
+        _exts = ['.srt'] + (['.txt'] if self.export_txt else []) \
+                         + (['.csv'] if self.export_csv else [])
+        # 後片付けは _claim_whisper_srt が行う。失敗時は完成品の唯一の写しが
+        # 一時フォルダに残ることがあるため，ここで rmtree してはいけない
+        srt, _err = _claim_whisper_srt(outdir, self.video, _exts, self.log.emit)
+        if srt is None:
+            self.done.emit(False, _err)
             return
 
         # しきつめ（全区間を漏れなく記録）はしきい値付きの[間]記録の上位互換なので、
@@ -2136,7 +2429,11 @@ class BatchWhisperWorker(QThread):
             video = self.files[i]
             total = len(self.files)  # 追加分を反映
 
-            self.file_started.emit(i + 1, total, Path(video).name)
+            # 親フォルダ名を添える。参加者ごとのフォルダに同名動画を置く運用
+            # （IMG_0001.MOV 等）で，処理中表示と失敗一覧を区別できるようにする
+            _vp = Path(video)
+            _disp = f'{_vp.parent.name}/{_vp.name}' if _vp.parent.name else _vp.name
+            self.file_started.emit(i + 1, total, _disp)
 
             # ① Dropbox等のクラウドファイルなら、まず実体をダウンロード
             if _is_dataless(video):
@@ -2158,7 +2455,7 @@ class BatchWhisperWorker(QThread):
                           if _lang == 'ja' else
                           'Loading model… (the first run takes 10–30 seconds)')
 
-            outdir = str(Path(video).parent)
+            outdir = tempfile.mkdtemp(prefix='easytranscribe-')   # 出力名の推測を避ける（単体側と同じ）
             cmd, _engine = _build_transcribe_cmd(video, self.model, self.language, outdir,
                                                   silent_recording=self.silent_recording)
 
@@ -2177,26 +2474,25 @@ class BatchWhisperWorker(QThread):
                                 self.seg_progress.emit(ts)
                 self._proc.wait()
             except Exception as exc:
+                shutil.rmtree(outdir, ignore_errors=True)
                 self.file_done.emit(i + 1, total, False, str(exc))
                 i += 1
                 continue
 
             if self._proc.returncode != 0:
+                # 中止もここに来る。利用者のファイルには触れていない
+                shutil.rmtree(outdir, ignore_errors=True)
                 self.file_done.emit(i + 1, total, False,
                     f"whisper error (code {self._proc.returncode})")
                 i += 1
                 continue
 
-            # SRTを探す
-            stem = Path(video).stem
-            srt  = Path(outdir) / (stem + '.srt')
-            if not srt.exists():
-                hits = sorted(Path(outdir).glob('*.srt'),
-                              key=lambda p: p.stat().st_mtime, reverse=True)
-                srt  = hits[0] if hits else srt
-
-            if not srt.exists():
-                self.file_done.emit(i + 1, total, False, f"SRT not found: {srt}")
+            _exts = ['.srt'] + (['.txt'] if self.export_txt else []) \
+                             + (['.csv'] if self.export_csv else [])
+            # 後片付けは _claim_whisper_srt が行う（失敗時に写しを残すため）
+            srt, _err = _claim_whisper_srt(outdir, video, _exts, self.log.emit)
+            if srt is None:
+                self.file_done.emit(i + 1, total, False, _err)
                 i += 1
                 continue
 
@@ -2294,6 +2590,7 @@ class BatchDialog(QDialog):
         self.setWindowTitle('複数ファイルの文字起こし' if _lang == 'ja' else 'Transcribe Multiple Files')
         self.setMinimumSize(700, 500)
         self._worker: Optional[BatchWhisperWorker] = None
+        self._failures = []   # (ファイル名, エラー文)。完了ダイアログで実名を出す
         self._default_model           = model
         self._default_language        = language
         self._default_silence         = mark_silence
@@ -2515,6 +2812,7 @@ class BatchDialog(QDialog):
             self.cmb_model.setItemText(i, _model_item_text(m, cached, rec_model))
 
     def _start(self):
+        self._failures = []
         files = [self.file_list.item(i).text()
                  for i in range(self.file_list.count())]
         if not files:
@@ -2655,6 +2953,7 @@ class BatchDialog(QDialog):
         import time
         self._cur_file  = current
         self._cur_total = total
+        self._cur_name  = name
         self._creep     = 0.0
         self._cur_dur   = 0.0       # 新ファイル開始：進捗をリセット
         self._cur_pos   = 0.0
@@ -2677,6 +2976,9 @@ class BatchDialog(QDialog):
         self._update_progress()
         status = '✓' if ok else '✗'
         self.log.append(f"  {status} {msg}")
+        if not ok:
+            # ログは高さ140pxで流れてしまう。完了ダイアログで実名を出すために貯める
+            self._failures.append((getattr(self, '_cur_name', '?'), msg))
 
         # 残り時間を推定
         if self._batch_start_time and current > 0:
@@ -2707,8 +3009,7 @@ class BatchDialog(QDialog):
         self.progress.setValue(1000)
         self.lbl_current.setVisible(False)
         self.lbl_detail.setVisible(False)
-        msg = (f"完了: {success}/{total} ファイル処理しました"
-               if _lang == 'ja' else f"Done: {success}/{total} files processed.")
+        msg = _batch_summary_text(success, total, getattr(self, '_failures', []))
         self.log.append(f"\n{'='*40}\n{msg}")
         QMessageBox.information(self,
             '完了' if _lang == 'ja' else 'Done', msg)
@@ -5139,7 +5440,10 @@ class MainWindow(QMainWindow):
 
             def _on_result(tag, url, dmg_url):
                 latest = tag.lstrip("v")
-                if latest and latest > APP_VERSION:
+                # 文字列比較では "1.2.11" > "1.2.9" が False になり、
+                # 1.2.0〜1.2.9 の全利用者に「最新です」と表示されて
+                # 以後の修正が一切届かなくなる。数値で比較する。
+                if latest and _ver_key(latest) > _ver_key(APP_VERSION):
                     ver_lbl.setText(
                         f"<p style='text-align:center; color:#e63946; font-size:11px;'>"
                         + (f"v{latest} が利用可能！" if _lang == 'ja' else f"v{latest} is available!")
