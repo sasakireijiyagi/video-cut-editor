@@ -5290,7 +5290,8 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dlg)
         layout.setSpacing(12)
 
-        brand = QLabel("<p style='text-align:center; font-size:22px;'>ヤギ製作所</p>")
+        brand = QLabel("<p style='text-align:center; font-size:22px; margin-bottom:0;'>ヤギ製作所</p>"
+                       "<p style='text-align:center; font-size:12px; color:#666; margin-top:2px;'>九州大学佐々木玲仁研究室</p>")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(brand)
 
@@ -5575,12 +5576,12 @@ class SplashScreen(QWidget):
         painter.drawText(self.rect().adjusted(0, -40, 0, 0),
                          Qt.AlignmentFlag.AlignCenter, 'ヤギ製作所')
 
-        # 佐々木玲仁研究室
+        # 九州大学佐々木玲仁研究室
         f2 = QFont(self._font_family, 18)
         painter.setFont(f2)
         painter.setPen(QColor('#555555'))
         painter.drawText(self.rect().adjusted(0, 140, 0, 0),
-                         Qt.AlignmentFlag.AlignCenter, '佐々木玲仁研究室')
+                         Qt.AlignmentFlag.AlignCenter, '九州大学佐々木玲仁研究室')
 
 
 # ──────────────────────────────────────────────────────────────────
