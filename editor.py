@@ -2768,8 +2768,8 @@ class BatchDialog(QDialog):
             self,
             'ファイルを選択（Cmd+クリックで複数選択）' if _lang == 'ja' else 'Select files (Cmd+click for multiple)',
             start,
-            '動画・音声 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;すべて (*)' if _lang == 'ja'
-            else 'Video / Audio (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;All (*)')
+            '動画・音声 (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;すべて (*)' if _lang == 'ja'
+            else 'Video / Audio (*.mp4 *.mov *.MOV *.avi *.mkv *.m4v *.webm *.mp3 *.wav *.m4a *.aac *.flac *.ogg);;All (*)')
         if paths:
             self._last_dir = str(Path(paths[0]).parent)
         self._append_paths(paths)
@@ -2783,9 +2783,13 @@ class BatchDialog(QDialog):
         if not folder:
             return
         self._last_dir = folder
-        exts = {'.mp4', '.mov', '.MOV', '.avi', '.mkv', '.m4v', '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'}
+        # ドラッグ&ドロップや単体オープン(_MEDIA_EXTS)と同じ集合にそろえる。
+        # suffix は小文字化して照合する。以前は .MOV しか大文字を拾えず，
+        # .MP4 や .WAV のファイルがフォルダ追加で無言で取りこぼされていた
+        exts = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.webm',
+                '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg'}
         paths = [str(p) for p in sorted(Path(folder).iterdir())
-                 if p.suffix in exts]
+                 if p.suffix.lower() in exts]
         self._append_paths(paths)
 
     def _append_paths(self, paths):

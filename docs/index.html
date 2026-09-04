@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>おまかせ文字起こし — 動画を開くだけで文字起こし・カット・字幕焼き込み | EasyTranscribe</title>
-  <meta name="description" content="動画を開いてボタンを押すだけ。OpenAI Whisperで100言語に対応した無料の文字起こしツール。完全ローカル動作でプライバシー安心。Mac / Windows対応。インストーラー付きで即使える。">
-  <meta name="keywords" content="文字起こし,自動文字起こし,Whisper,無料,ローカル,動画,字幕,インタビュー,講義,会議,Mac,Windows,EasyTranscribe">
+  <meta name="description" content="動画を開いてボタンを押すだけ。OpenAI Whisperで100言語に対応した無料の文字起こしツール。完全ローカル動作でプライバシー安心。インタビュー・会議・講義の逐語録づくりに。Mac / Windows対応。">
+  <meta name="keywords" content="文字起こし,自動文字起こし,逐語録,Whisper,無料,ローカル,動画,字幕,インタビュー,講義,会議,質的研究,ELAN,EAF,Mac,Windows,EasyTranscribe">
   <meta name="google-site-verification" content="X27hTtGK0DeluBd_bZirCDejo-S46s7V5m6wwHhLbis">
   <link rel="canonical" href="https://sasakireijiyagi.github.io/video-cut-editor/">
   <link rel="alternate" hreflang="ja" href="https://sasakireijiyagi.github.io/video-cut-editor/">
@@ -61,7 +61,59 @@
         "name": "九州大学"
       }
     },
+    "publisher": {
+      "@type": "Organization",
+      "name": "ヤギ製作所"
+    },
     "identifier": "https://doi.org/10.5281/zenodo.20515527"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "本当に無料ですか？回数や時間の制限はありますか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "無料です。回数・時間・ファイル数の制限はなく、アカウント登録も不要です。MIT License で公開しており、商用利用もできます。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "音声や動画が外部に送信されることはありませんか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ありません。文字起こしはすべてお使いのパソコンの中で行われ、音声や動画のデータが外部のサーバーに送られることはありません。守秘が必要な研究データやインタビュー音声も、手元だけで逐語録にできます。インターネット接続が必要なのは、最初のセットアップと、使うモデルを初めて選んだときのダウンロードだけです。一度ダウンロードしたモデルは、以後オフラインでも使えます。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "インタビューの逐語録づくりに使えますか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "使えます。文字起こし結果はその場で編集でき、SRT のほか時間つきテキスト（TXT）や Excel で開ける CSV でも保存できます。発話間の沈黙を [間] として時間つきで記録する機能や、無音区間も含めて全区間を漏れなく記録する「しきつめ」機能があり、会話分析・質的研究向けの注釈ツール ELAN 用の EAF ファイルにも書き出せます。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "対応しているファイル形式は何ですか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "動画は mp4・mov・avi・mkv・m4v・webm、音声は mp3・wav・m4a・aac・flac・ogg に対応しています。Zoom の録画・録音ファイルもそのまま開けます。"
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "編集した字幕が上書きで消えることはありませんか？",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "v1.2.12 から、同じファイルをもう一度文字起こしする際に、編集済みの字幕ファイルを自動で退避する仕組みが入りました。退避したファイルは「元の名前.backup.srt」という名前で同じ場所に残り、そのまま開き直せます。退避ができない状況（容量不足や権限など）では、上書きせずに処理を中止します。"
+        }
+      }
+    ]
   }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -427,6 +479,28 @@
       text-decoration: none;
     }
     .citation-box a:hover { text-decoration: underline; }
+    .faq-item {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 0.2rem 1.2rem;
+      margin-bottom: 0.6rem;
+      text-align: left;
+    }
+    .faq-item summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.92rem;
+      padding: 0.65rem 0;
+      color: #1a1a1a;
+    }
+    .faq-item summary:hover { color: #e63946; }
+    .faq-item p {
+      color: #555;
+      font-size: 0.88rem;
+      line-height: 1.8;
+      padding: 0 0.2rem 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -542,6 +616,33 @@
 
   </section>
 
+
+
+  <section class="citation-section">
+    <h2 class="section-label">FAQ</h2>
+    <div style="max-width: 640px; margin: 0 auto;">
+      <details class="faq-item">
+        <summary>本当に無料ですか？回数や時間の制限はありますか？</summary>
+        <p>無料です。回数・時間・ファイル数の制限はなく、アカウント登録も不要です。MIT License で公開しており、商用利用もできます。</p>
+      </details>
+      <details class="faq-item">
+        <summary>音声や動画が外部に送信されることはありませんか？</summary>
+        <p>ありません。文字起こしはすべてお使いのパソコンの中で行われ、音声や動画のデータが外部のサーバーに送られることはありません。守秘が必要な研究データやインタビュー音声も、手元だけで逐語録にできます。インターネット接続が必要なのは、最初のセットアップと、使うモデルを初めて選んだときのダウンロードだけです。一度ダウンロードしたモデルは、以後オフラインでも使えます。</p>
+      </details>
+      <details class="faq-item">
+        <summary>インタビューの逐語録づくりに使えますか？</summary>
+        <p>使えます。文字起こし結果はその場で編集でき、SRT のほか時間つきテキスト（TXT）や Excel で開ける CSV でも保存できます。発話間の沈黙を [間] として時間つきで記録する機能や、無音区間も含めて全区間を漏れなく記録する「しきつめ」機能があり、会話分析・質的研究向けの注釈ツール ELAN 用の EAF ファイルにも書き出せます。</p>
+      </details>
+      <details class="faq-item">
+        <summary>対応しているファイル形式は何ですか？</summary>
+        <p>動画は mp4・mov・avi・mkv・m4v・webm、音声は mp3・wav・m4a・aac・flac・ogg に対応しています。Zoom の録画・録音ファイルもそのまま開けます。</p>
+      </details>
+      <details class="faq-item">
+        <summary>編集した字幕が上書きで消えることはありませんか？</summary>
+        <p>v1.2.12 から、同じファイルをもう一度文字起こしする際に、編集済みの字幕ファイルを自動で退避する仕組みが入りました。退避したファイルは「元の名前.backup.srt」という名前で同じ場所に残り、そのまま開き直せます。退避ができない状況（容量不足や権限など）では、上書きせずに処理を中止します。</p>
+      </details>
+    </div>
+  </section>
 
   <section class="citation-section" id="changelog-section" style="display:none;">
     <h2 class="section-label">更新履歴</h2>
