@@ -83,6 +83,48 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 
 # ──────────────────────────────────────────────────────────────────
+# 誤操作よけ / Guard against accidental wheel input
+# ──────────────────────────────────────────────────────────────────
+
+# Qt の既定では，閉じているコンボボックスやスピンボックスの上で
+# ホイールを回す（トラックパッドの2本指スクロールを含む）と，値が
+# 無言で変わる。幅90pxの言語コンボが変わったことには気づきにくい。
+#
+# 利用者から「M4Aを文字起こししたら文字がすべて文字化けした」という
+# 報告が1件あった。起こす言語が日本語から別の言語に変わったまま
+# 実行され，別の文字体系で書き取られたためと推定している（同じ操作で
+# 再現することは確認した。報告者の環境でそうだったかは未確認）。
+#
+# そのため，閉じている間はホイールを受け取らないようにする。
+# 開いているときの一覧のスクロールは別のウィジェット（popup 内の
+# QAbstractItemView）が受けるので影響しない。
+
+class NoWheelComboBox(QComboBox):
+    """閉じている間はホイールで選択が変わらないコンボボックス。
+
+    ignore() なのでホイールは親に渡る。祖先にスクロール領域があれば
+    そちらが動く（コンボが食べて画面が動かない，ということにはしない）。
+    """
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoWheelSpinBox(QSpinBox):
+    """ホイールで値が変わらないスピンボックス。ホイールは親に渡る。"""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoWheelDoubleSpinBox(QDoubleSpinBox):
+    """ホイールで値が変わらないスピンボックス（小数）。ホイールは親に渡る。"""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+# ──────────────────────────────────────────────────────────────────
 # 言語辞書 / String dictionary
 # ──────────────────────────────────────────────────────────────────
 
@@ -2650,7 +2692,7 @@ class BatchDialog(QDialog):
         # ── 設定 ──
         cfg = QHBoxLayout()
         cfg.addWidget(QLabel('モデル:' if _lang == 'ja' else 'Model:'))
-        self.cmb_model = QComboBox()
+        self.cmb_model = NoWheelComboBox()
         self._models = ['large-v3-turbo','large-v3','turbo','medium','small','base','tiny']
         rec_model = _recommended_model(_lang_code_of(self._default_language))
         cached = _cached_models()
@@ -2667,7 +2709,7 @@ class BatchDialog(QDialog):
         cfg.addWidget(self.cmb_model)
         cfg.addSpacing(12)
         cfg.addWidget(QLabel('言語:' if _lang == 'ja' else 'Language:'))
-        self.cmb_lang = QComboBox()
+        self.cmb_lang = NoWheelComboBox()
         self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setCurrentText(self._default_language)
         self.cmb_lang.currentIndexChanged.connect(self._refresh_model_marks)
@@ -2675,7 +2717,7 @@ class BatchDialog(QDialog):
         cfg.addSpacing(12)
         self.chk_silence = QCheckBox('[間]を記録' if _lang == 'ja' else 'Record [Pause]')
         self.chk_silence.setChecked(self._default_silence)
-        self.spn_silence = QDoubleSpinBox()
+        self.spn_silence = NoWheelDoubleSpinBox()
         self.spn_silence.setRange(0.5, 10.0)
         self.spn_silence.setSingleStep(0.5)
         self.spn_silence.setValue(self._default_silence_sec)
@@ -2687,7 +2729,7 @@ class BatchDialog(QDialog):
         self.chk_fill_gaps.setToolTip('発話間のすべての隙間にエントリを挿入する' if _lang == 'ja'
                                       else 'Insert an entry for every gap between utterances')
         self.chk_fill_gaps.setChecked(self._default_fill_gaps)
-        self.cmb_fill_mode = QComboBox()
+        self.cmb_fill_mode = NoWheelComboBox()
         self.cmb_fill_mode.addItems(['[間]表示' if _lang == 'ja' else '[Pause] label',
                                      '空欄' if _lang == 'ja' else 'Blank'])
         self.cmb_fill_mode.setCurrentIndex(0 if self._default_fill_mode == 'label' else 1)
@@ -4292,12 +4334,12 @@ class MainWindow(QMainWindow):
         self.lbl_transcribe = QLabel(tr('transcribe_label'))
         w_bar.addWidget(self.lbl_transcribe)
 
-        self.cmb_model = QComboBox()
+        self.cmb_model = NoWheelComboBox()
         self.cmb_model.setMinimumWidth(180)
         self.cmb_model.setToolTip(tr('model_tip'))
 
         # 言語コンボが先。_populate_models() が現在の言語から推奨モデルを決めるため
-        self.cmb_lang = QComboBox()
+        self.cmb_lang = NoWheelComboBox()
         self.cmb_lang.addItems(_lang_display_names())
         self.cmb_lang.setToolTip(tr('lang_tip'))
 
@@ -4321,7 +4363,7 @@ class MainWindow(QMainWindow):
         self.chk_mark_silence = QCheckBox(tr('mark_silence'))
         self.chk_mark_silence.setToolTip(tr('mark_silence_tip'))
 
-        self.spn_silence = QDoubleSpinBox()
+        self.spn_silence = NoWheelDoubleSpinBox()
         self.spn_silence.setRange(0.5, 10.0)
         self.spn_silence.setSingleStep(0.5)
         self.spn_silence.setValue(1.0)
@@ -4330,7 +4372,7 @@ class MainWindow(QMainWindow):
 
         self.chk_fill_gaps = QCheckBox(tr('fill_gaps'))
         self.chk_fill_gaps.setToolTip(tr('fill_gaps_tip'))
-        self.cmb_fill_mode = QComboBox()
+        self.cmb_fill_mode = NoWheelComboBox()
         self.cmb_fill_mode.addItems([tr('fill_mode_label'), tr('fill_mode_blank')])
         self.cmb_fill_mode.setEnabled(False)
         self.chk_fill_gaps.toggled.connect(self.cmb_fill_mode.setEnabled)
@@ -4482,7 +4524,7 @@ class MainWindow(QMainWindow):
                                      if _lang == 'ja' else
                                      'Burn subtitles into video (re-encodes)')
         lbl_fsize = QLabel('フォントサイズ:' if _lang == 'ja' else 'Font size:')
-        self.spn_font_size = QSpinBox()
+        self.spn_font_size = NoWheelSpinBox()
         self.spn_font_size.setRange(20, 120)
         self.spn_font_size.setValue(40)
         self.spn_font_size.setSuffix(' px')

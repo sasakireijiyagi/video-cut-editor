@@ -379,6 +379,105 @@ check('一括: 既存の編集が退避されている',
       and (work / 'ok.backup.srt').read_text(encoding='utf-8') == '既存の編集')
 
 # ─────────────────────────────────────────────────────────────
+print('\n== 誤操作よけ（ホイールで設定が変わらない） ==')
+# 閉じているコンボの上でホイールを回すと、Qt の既定では選択が無言で
+# 変わる。起こす言語が変わったまま文字起こしされると、別の文字体系で
+# 書き取られて「文字化け」に見える。実際に報告が1件あった。
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+from PyQt6.QtWidgets import QApplication, QComboBox, QSpinBox, QDoubleSpinBox
+from PyQt6.QtGui import QWheelEvent
+from PyQt6.QtCore import QPointF, QPoint, Qt as _Qt
+
+_app = QApplication.instance() or QApplication([])
+
+
+def _spin_wheel(widget, clicks=3):
+    """トラックパッドの2本指スクロール相当を送る。"""
+    for _ in range(clicks):
+        _app.sendEvent(widget, QWheelEvent(
+            QPointF(10, 10), QPointF(10, 10), QPoint(0, 0), QPoint(0, -120),
+            _Qt.MouseButton.NoButton, _Qt.KeyboardModifier.NoModifier,
+            _Qt.ScrollPhase.NoScrollPhase, False))
+
+
+# まず「この検査が本当に鳴るか」を素の QComboBox で確かめる。
+# 鳴らない検査を置くと、守れていないのに通ったように見える。
+_bare = QComboBox()
+_bare.addItems(['日本語', '英語', '中国語', '韓国語'])
+_bare.setCurrentIndex(0)
+_spin_wheel(_bare)
+check('検査そのものが効いている（素のコンボは実際に変わる）',
+      _bare.currentText() != '日本語',
+      f'素のQComboBoxが変わらない＝この検査は何も見ていない（{_bare.currentText()}）')
+
+for _cls_name, _items, _label in [
+    ('NoWheelComboBox', ['日本語', '英語', '中国語', '韓国語'], 'コンボ'),
+]:
+    _w = getattr(m, _cls_name)()
+    _w.addItems(_items)
+    _w.setCurrentIndex(0)
+    _spin_wheel(_w)
+    check(f'{_label}: ホイールで選択が変わらない', _w.currentText() == _items[0],
+          f'{_items[0]} → {_w.currentText()}')
+
+_s = m.NoWheelSpinBox(); _s.setRange(0, 100); _s.setValue(20)
+_spin_wheel(_s)
+check('スピンボックス: ホイールで値が変わらない', _s.value() == 20, f'20 → {_s.value()}')
+
+_d = m.NoWheelDoubleSpinBox(); _d.setRange(0.0, 10.0); _d.setValue(1.0)
+_spin_wheel(_d)
+check('スピンボックス（小数）: ホイールで値が変わらない', _d.value() == 1.0, f'1.0 → {_d.value()}')
+
+# 設定を変える部品が素のクラスのまま残っていないか（置き換え漏れの検出）。
+# 文字列一致だと QComboBox(self) や addWidget(QComboBox()) を見逃すので、
+# クラス定義行と QSS 文字列を除いた上で正規表現で探す。
+import re
+_src_lines = EDITOR.read_text(encoding='utf-8').split('\n')
+_bare_uses = []
+for _i, _ln in enumerate(_src_lines, 1):
+    if _ln.startswith('class NoWheel'):
+        continue
+    if re.search(r'(?<![\w.])(?<!NoWheel)Q(?:ComboBox|SpinBox|DoubleSpinBox)\s*\(', _ln):
+        _bare_uses.append(f'{_i}: {_ln.strip()[:60]}')
+check('素のコンボ／スピンを生成している箇所がない', not _bare_uses,
+      '; '.join(_bare_uses))
+
+# やり過ぎの検出。キーボードでの選択が殺されていないこと。
+# setCurrentIndex() は API 呼び出しでイベントを通らないため、
+# keyPressEvent を潰しても必ず通ってしまう。実際にキーを送ること。
+from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtCore import QEvent as _QEvent
+
+
+def _send_key(widget, key):
+    widget.setFocus()
+    _app.sendEvent(widget, QKeyEvent(
+        _QEvent.Type.KeyPress, key, _Qt.KeyboardModifier.NoModifier))
+
+
+# まずこの検査が鳴るかを、キーも殺したクラスで確かめる
+class _DeadCombo(m.NoWheelComboBox):
+    def keyPressEvent(self, e):
+        e.ignore()
+
+
+_dead = _DeadCombo(); _dead.addItems(['日本語', '英語', '中国語']); _dead.setCurrentIndex(0)
+_send_key(_dead, _Qt.Key.Key_Down)
+check('検査そのものが効いている（キーを殺すと下キーが通らない）',
+      _dead.currentText() == '日本語',
+      'キーを殺しても値が変わった＝この検査は何も見ていない')
+
+_k = m.NoWheelComboBox(); _k.addItems(['日本語', '英語', '中国語']); _k.setCurrentIndex(0)
+_send_key(_k, _Qt.Key.Key_Down)
+check('コンボ: 下キーでの選択は従来どおり効く', _k.currentText() == '英語',
+      f'日本語 → {_k.currentText()}')
+
+_ks = m.NoWheelSpinBox(); _ks.setRange(0, 100); _ks.setValue(20)
+_send_key(_ks, _Qt.Key.Key_Up)
+check('スピンボックス: 上キーでの増減は従来どおり効く', _ks.value() == 21,
+      f'20 → {_ks.value()}')
+
+# ─────────────────────────────────────────────────────────────
 os.chdir('/')
 import shutil as _sh
 _sh.rmtree(work, ignore_errors=True)
