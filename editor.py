@@ -4385,6 +4385,12 @@ class MainWindow(QMainWindow):
 
         self.chk_silent_recording = QCheckBox(tr('silent_recording'))
         self.chk_silent_recording.setToolTip(tr('silent_recording_tip'))
+        # 既定でオン。インタビューや講義など，黙っている時間がある録音が主な用途で，
+        # 冒頭や無音区間に Whisper が定型句（「以上で終わります」など）を湧かせる。
+        # 58分の録音の冒頭に，言っていない字幕が入ったという報告があった。
+        # 処理時間は1〜2割増えるが，湧いた行を手で探す手間のほうが大きい。
+        # 一括処理の画面はここの状態を引き継ぐ（BatchDialog の silent_recording）。
+        self.chk_silent_recording.setChecked(True)
 
         self.lbl_model = QLabel(tr('model_label'))
         self.lbl_lang  = QLabel(tr('lang_label'))

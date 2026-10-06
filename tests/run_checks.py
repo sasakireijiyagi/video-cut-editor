@@ -88,6 +88,8 @@ if sys.platform == 'darwin':
             'IMPORTED' in r.stdout, (r.stderr or '')[-200:])
 
 m = load_editor()
+# 以降の節が _build_transcribe_cmd を差し替えるので、本物をここで退避しておく
+_REAL_BUILD_CMD = m._build_transcribe_cmd
 from PyQt6.QtWidgets import QApplication          # noqa: E402
 app = QApplication.instance() or QApplication([])
 
@@ -476,6 +478,42 @@ _ks = m.NoWheelSpinBox(); _ks.setRange(0, 100); _ks.setValue(20)
 _send_key(_ks, _Qt.Key.Key_Up)
 check('スピンボックス: 上キーでの増減は従来どおり効く', _ks.value() == 21,
       f'20 → {_ks.value()}')
+
+# ─────────────────────────────────────────────────────────────
+print('\n== 幻聴よけ（無音が多い録音を既定でオン） ==')
+# Whisper は冒頭や無音区間に定型句（「以上で終わります」など）を湧かせる。
+# 抑制のフラグは --word-timestamps True とセットでないと効かない。
+
+_w = m.MainWindow()
+check('主画面: 「無音が多い録音」が既定でオン',
+      _w.chk_silent_recording.isChecked(),
+      '既定がオフだと，利用者は幻聴を1回踏むまで選択肢に気づけない')
+
+# 既定の状態で，抑制のフラグが実際にコマンドへ乗るか（両エンジン）
+for _eng_name, _model in [('mlx', 'large-v3'), ('openai', 'large-v3')]:
+    _cmd, _ = _REAL_BUILD_CMD(
+        'a.mp4', _model, 'ja', '/tmp',
+        silent_recording=_w.chk_silent_recording.isChecked())
+    _joined = ' '.join(_cmd)
+    _has_thr = 'hallucination-silence-threshold' in _joined or 'hallucination_silence_threshold' in _joined
+    _has_wts = 'word-timestamps' in _joined or 'word_timestamps' in _joined
+    check(f'既定の状態で幻聴抑制のフラグが乗る（{_eng_name}）', _has_thr, _joined)
+    # しきい値は単語単位の時刻が無いと効かない。片方だけ付けても意味がない
+    check(f'単語単位の時刻もセットで乗る（{_eng_name}）', _has_wts, _joined)
+    break   # エンジンはこの環境で決まるので1回でよい
+
+# 切ったときは乗らないこと（利用者が外せること）
+_cmd_off, _ = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
+                              silent_recording=False)
+check('チェックを外せば従来どおりフラグは乗らない',
+      'hallucination' not in ' '.join(_cmd_off), ' '.join(_cmd_off))
+
+# 一括処理の画面が主画面の状態を引き継ぐか
+_dlg = m.BatchDialog(None, model='large-v3', language='日本語',
+                     mark_silence=False, silence_sec=1.0, fill_gaps=False,
+                     fill_mode='label', export_txt=False, export_csv=False,
+                     silent_recording=_w.chk_silent_recording.isChecked())
+check('一括処理: 主画面の状態を引き継ぐ', _dlg.chk_silent_rec.isChecked())
 
 # ─────────────────────────────────────────────────────────────
 os.chdir('/')
