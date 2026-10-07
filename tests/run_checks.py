@@ -492,9 +492,16 @@ check('主画面: 「無音が多い録音」が既定でオン',
 # 既定の状態で，抑制のフラグが実際にコマンドへ乗るか。
 # エンジンごとに綴りが違う（mlx=ハイフン / openai=アンダースコア）ので，
 # 実際のエンジンに合う綴りだけを要求する。両方許すと取り違えを見逃す。
-m._supports_hallucination_flags.cache_clear()
+#
+# 対応可否の判定はここでは「対応あり」に固定する。CI の実行環境には
+# whisper が入っていないため，実物を使うと判定が False になり，
+# コマンドの組み立てを見たいのに環境の違いを見てしまう。
+# 判定そのものは下の「対応していないエンジン」「--help が取れないとき」で見る。
+_real_supports = m._supports_hallucination_flags
+m._supports_hallucination_flags = lambda _p: True
 _cmd, _eng = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
                              silent_recording=_w.chk_silent_recording.isChecked())
+m._supports_hallucination_flags = _real_supports
 _joined = ' '.join(_cmd)
 _thr, _wts = ('--hallucination-silence-threshold', '--word-timestamps') \
     if _eng == 'mlx' else ('--hallucination_silence_threshold', '--word_timestamps')
@@ -513,7 +520,6 @@ check('チェックを外せば従来どおりフラグは乗らない',
 
 # 対応していないエンジンには付けないこと。
 # 古い whisper に渡すと argparse が code 2 で落ち，文字起こしが丸ごと失敗する。
-_real_supports = m._supports_hallucination_flags
 try:
     m._supports_hallucination_flags = lambda _p: False
     _cmd_old, _ = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
