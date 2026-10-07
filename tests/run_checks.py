@@ -489,18 +489,21 @@ check('主画面: 「無音が多い録音」が既定でオン',
       _w.chk_silent_recording.isChecked(),
       '既定がオフだと，利用者は幻聴を1回踏むまで選択肢に気づけない')
 
-# 既定の状態で，抑制のフラグが実際にコマンドへ乗るか（両エンジン）
-for _eng_name, _model in [('mlx', 'large-v3'), ('openai', 'large-v3')]:
-    _cmd, _ = _REAL_BUILD_CMD(
-        'a.mp4', _model, 'ja', '/tmp',
-        silent_recording=_w.chk_silent_recording.isChecked())
-    _joined = ' '.join(_cmd)
-    _has_thr = 'hallucination-silence-threshold' in _joined or 'hallucination_silence_threshold' in _joined
-    _has_wts = 'word-timestamps' in _joined or 'word_timestamps' in _joined
-    check(f'既定の状態で幻聴抑制のフラグが乗る（{_eng_name}）', _has_thr, _joined)
-    # しきい値は単語単位の時刻が無いと効かない。片方だけ付けても意味がない
-    check(f'単語単位の時刻もセットで乗る（{_eng_name}）', _has_wts, _joined)
-    break   # エンジンはこの環境で決まるので1回でよい
+# 既定の状態で，抑制のフラグが実際にコマンドへ乗るか。
+# エンジンごとに綴りが違う（mlx=ハイフン / openai=アンダースコア）ので，
+# 実際のエンジンに合う綴りだけを要求する。両方許すと取り違えを見逃す。
+m._supports_hallucination_flags.cache_clear()
+_cmd, _eng = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
+                             silent_recording=_w.chk_silent_recording.isChecked())
+_joined = ' '.join(_cmd)
+_thr, _wts = ('--hallucination-silence-threshold', '--word-timestamps') \
+    if _eng == 'mlx' else ('--hallucination_silence_threshold', '--word_timestamps')
+_wrong = ('--hallucination_silence_threshold' if _eng == 'mlx'
+          else '--hallucination-silence-threshold')
+check(f'既定の状態で幻聴抑制のフラグが乗る（{_eng}）', _thr in _cmd, _joined)
+# しきい値は単語単位の時刻が無いと効かない。片方だけ付けても意味がない
+check(f'単語単位の時刻もセットで乗る（{_eng}）', _wts in _cmd, _joined)
+check(f'もう一方のエンジンの綴りは混ざっていない（{_eng}）', _wrong not in _cmd, _joined)
 
 # 切ったときは乗らないこと（利用者が外せること）
 _cmd_off, _ = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
@@ -508,12 +511,35 @@ _cmd_off, _ = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
 check('チェックを外せば従来どおりフラグは乗らない',
       'hallucination' not in ' '.join(_cmd_off), ' '.join(_cmd_off))
 
-# 一括処理の画面が主画面の状態を引き継ぐか
+# 対応していないエンジンには付けないこと。
+# 古い whisper に渡すと argparse が code 2 で落ち，文字起こしが丸ごと失敗する。
+_real_supports = m._supports_hallucination_flags
+try:
+    m._supports_hallucination_flags = lambda _p: False
+    _cmd_old, _ = _REAL_BUILD_CMD('a.mp4', 'large-v3', 'ja', '/tmp',
+                                  silent_recording=True)
+    check('対応していないエンジンにはフラグを付けない',
+          'hallucination' not in ' '.join(_cmd_old), ' '.join(_cmd_old))
+    # 判定がつかないとき（--help が失敗）も付けない＝落ちるより遅いほうがよい
+    m._supports_hallucination_flags = _real_supports
+    m._supports_hallucination_flags.cache_clear()
+    check('--help が取れないときは付けない（fail close）',
+          m._supports_hallucination_flags('/nonexistent/whisper') is False)
+finally:
+    m._supports_hallucination_flags = _real_supports
+    m._supports_hallucination_flags.cache_clear()
+
+# 一括処理の画面が主画面の状態を引き継ぐか（受け渡しそのものを見る）
+import inspect as _insp
+_src_batch = _insp.getsource(m.MainWindow._open_batch)
+check('主画面が一括処理へ状態を渡している（呼び出し側）',
+      'silent_recording=self.chk_silent_recording.isChecked()' in _src_batch,
+      '受け渡しを切っても他の項目は通ってしまうため，呼び出し側の文面を見る')
 _dlg = m.BatchDialog(None, model='large-v3', language='日本語',
                      mark_silence=False, silence_sec=1.0, fill_gaps=False,
                      fill_mode='label', export_txt=False, export_csv=False,
                      silent_recording=_w.chk_silent_recording.isChecked())
-check('一括処理: 主画面の状態を引き継ぐ', _dlg.chk_silent_rec.isChecked())
+check('一括処理: 受け取った状態を反映する', _dlg.chk_silent_rec.isChecked())
 
 # ─────────────────────────────────────────────────────────────
 os.chdir('/')

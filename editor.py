@@ -48,6 +48,7 @@ if _p:
     os.environ.setdefault('QT_PLUGIN_PATH', _p)
 
 import re
+import functools
 import subprocess
 
 if sys.platform == 'win32':
@@ -1128,13 +1129,35 @@ def _active_engine(model: str):
         return ('mlx', MLX_WHISPER_BIN)
     return ('openai', WHISPER_BIN)
 
+@functools.lru_cache(maxsize=8)
+def _supports_hallucination_flags(binpath: str) -> bool:
+    """このエンジンが幻聴よけのフラグを受け付けるか。--help を1回だけ見る。
+
+    古い whisper には --hallucination_silence_threshold が無く，渡すと
+    argparse が「unrecognized arguments」で終了コード2になり，文字起こしが
+    丸ごと失敗する。幻聴よけを既定でオンにしたので，調べずに渡すと
+    古いエンジンの利用者が全員，最初の1回で踏むことになる。
+    判定がつかないときは False（付けない）。遅くなるほうが，落ちるよりよい。
+    --help は約1秒。同じパスなら以後はキャッシュから返す。
+    """
+    try:
+        r = subprocess.run([binpath, '--help'], capture_output=True, text=True,
+                           timeout=30, env=_child_env())
+        return 'hallucination' in ((r.stdout or '') + (r.stderr or ''))
+    except Exception:
+        return False
+
+
 def _build_transcribe_cmd(audio: str, model: str, language: str, outdir: str,
                           silent_recording: bool = False):
     """文字起こしの subprocess コマンドを組む。戻り値: (cmd:list, engine:str)。
     mlx_whisper と openai-whisper はフラグ名が異なる（ハイフン/アンダースコア・--verbose）
     ので、その差をここに集約する。stdout の区間行フォーマットは両者同一。
-    silent_recording=True のとき、単語単位タイムスタンプと幻聴抑制を追加する。"""
+    silent_recording=True のとき、単語単位タイムスタンプと幻聴抑制を追加する。
+    ただしエンジンが対応していなければ付けない（_supports_hallucination_flags）。"""
     engine, binpath = _active_engine(model)
+    if silent_recording and not _supports_hallucination_flags(binpath):
+        silent_recording = False
     if engine == 'mlx':
         cmd = [binpath, audio,
                '--model', _MLX_MODELS[model],
@@ -4385,10 +4408,11 @@ class MainWindow(QMainWindow):
 
         self.chk_silent_recording = QCheckBox(tr('silent_recording'))
         self.chk_silent_recording.setToolTip(tr('silent_recording_tip'))
-        # 既定でオン。インタビューや講義など，黙っている時間がある録音が主な用途で，
-        # 冒頭や無音区間に Whisper が定型句（「以上で終わります」など）を湧かせる。
-        # 58分の録音の冒頭に，言っていない字幕が入ったという報告があった。
-        # 処理時間は1〜2割増えるが，湧いた行を手で探す手間のほうが大きい。
+        # 既定でオン。黙っている時間がある録音では，冒頭や無音区間に Whisper が
+        # 定型句（「以上で終わります」など）を湧かせる。58分の録音の冒頭に，
+        # 言っていない字幕が入ったという報告があった。
+        # 代償は処理時間（ツールチップのとおり1〜2割増）だが，湧いた行を手で
+        # 探す手間のほうが大きいと判断した。外したい人はチェックを外せる。
         # 一括処理の画面はここの状態を引き継ぐ（BatchDialog の silent_recording）。
         self.chk_silent_recording.setChecked(True)
 
