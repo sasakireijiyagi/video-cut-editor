@@ -548,6 +548,48 @@ _dlg = m.BatchDialog(None, model='large-v3', language='日本語',
 check('一括処理: 受け取った状態を反映する', _dlg.chk_silent_rec.isChecked())
 
 # ─────────────────────────────────────────────────────────────
+print('\n== ログ欄の文字化け（日本語版Windows） ==')
+# 子プロセスの Python は，日本語版 Windows だと標準出力を cp932 で書く。
+# こちらは utf-8 で読むので，非ASCIIが全部 U+FFFD になりログ欄が化ける。
+# SRT は whisper が utf-8 固定で書くため，化けるのはログ欄だけだった。
+
+_env = m._child_env()
+_ioenc = _env.get('PYTHONIOENCODING', '').lower().replace('_', '-')
+check('子プロセスの環境に PYTHONIOENCODING=utf-8 がある',
+      _ioenc.split(':')[0] in ('utf-8', 'utf8'),
+      f"PYTHONIOENCODING={_env.get('PYTHONIOENCODING')!r}")
+
+# strict だと，復号できないファイル名（サロゲート）を子プロセスが出力した
+# 瞬間に UnicodeEncodeError で落ちる。化けを直したつもりで落ちるようにしない。
+_surrogate = "import sys; sys.stdout.write('ok:' + '\\udcff' + ':end')"
+_r_sur = subprocess.run([sys.executable, '-c', _surrogate],
+                        capture_output=True, env=m._child_env())
+check('復号できないファイル名を出力しても子プロセスが落ちない',
+      _r_sur.returncode == 0,
+      (_r_sur.stderr.decode('utf-8', 'replace').strip().split('\n') or [''])[-1][:80])
+
+# 実際に子プロセスを動かして，日本語がそのまま読めること。
+# 文字化けの再現条件（親が cp932 を要求する環境）をわざと作って確かめる。
+_sample = 'アレクサ今何時'
+_child = (f"import sys; sys.stdout.write({_sample!r})")
+
+_broken_env = dict(os.environ)
+_broken_env.pop('PYTHONIOENCODING', None)
+_broken_env['PYTHONIOENCODING'] = 'cp932'      # 化ける側を再現
+_r_bad = subprocess.run([sys.executable, '-c', _child], capture_output=True,
+                        env=_broken_env)
+_bad_text = _r_bad.stdout.decode('utf-8', errors='replace')
+check('検査そのものが効いている（cp932で書かせると実際に化ける）',
+      _bad_text != _sample and '�' in _bad_text,
+      f'化けなかった＝この検査は何も見ていない（{_bad_text!r}）')
+
+_r_ok = subprocess.run([sys.executable, '-c', _child], capture_output=True,
+                       env=m._child_env())
+check('_child_env() の下では日本語がそのまま読める',
+      _r_ok.stdout.decode('utf-8', errors='replace') == _sample,
+      repr(_r_ok.stdout.decode('utf-8', errors='replace')))
+
+# ─────────────────────────────────────────────────────────────
 os.chdir('/')
 import shutil as _sh
 _sh.rmtree(work, ignore_errors=True)

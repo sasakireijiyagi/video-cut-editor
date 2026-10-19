@@ -417,8 +417,20 @@ def _child_env() -> dict:
     呼ぶので気づけないが，同梱した ffmpeg を Application Support に置くと
     PATH に無く，whisper 側だけが FileNotFoundError で落ちる。
     そのため同梱先を PATH の先頭に加える。
+
+    あわせて PYTHONIOENCODING を utf-8 に固定する。日本語版 Windows では
+    子プロセスの Python が標準出力を cp932 で書くため，こちらが utf-8 で
+    読むと非ASCIIのバイトがすべて U+FFFD になり，ログ欄が文字化けする
+    （「アレクサ今何時」→「�A���N�T������」）。
+    whisper が書く SRT は utf-8 固定なので，化けるのはログ欄だけだった。
+    v1.2.13 で報告を受けたが，それ以前からずっと起きていた。
+
+    :replace まで付けるのは，復号できないファイル名（サロゲート）を
+    子プロセスが出力したときに UnicodeEncodeError で落ちるのを避けるため。
+    素の 'utf-8' は strict になり，実測で終了コード1になった。
     """
     env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8:replace'
     extra = []
     own = _bundled_ffmpeg_path().parent
     if own.is_dir():
