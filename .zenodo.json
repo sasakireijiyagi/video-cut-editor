@@ -1,0 +1,31 @@
+{
+  "upload_type": "software",
+  "title": "EasyTranscribe (おまかせ文字起こし)",
+  "creators": [
+    {
+      "name": "Sasaki, Reiji",
+      "affiliation": "Faculty of Human-Environment Studies, Kyushu University"
+    }
+  ],
+  "license": "mit",
+  "access_right": "open",
+  "keywords": [
+    "transcription",
+    "speech recognition",
+    "Whisper",
+    "qualitative research",
+    "subtitles",
+    "ELAN",
+    "EAF",
+    "local-only",
+    "macOS",
+    "Windows"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://sasakireijiyagi.github.io/video-cut-editor/",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    }
+  ]
+}
