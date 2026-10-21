@@ -34,7 +34,7 @@ Once allowed, the app opens normally with a double-click from then on.
 
 ---
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515526.svg)](https://doi.org/10.5281/zenodo.20515526)
 
 If this tool is useful to you, please give it a **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** — it really helps!
 
@@ -283,7 +283,9 @@ This is experimental software for research and educational use. No warranty is p
 
 If you use this tool in your research, please cite it as:
 
-> Sasaki, R. (2026). EasyTranscribe [Computer software]. https://doi.org/10.5281/zenodo.20515527
+> Sasaki, R. (2026). EasyTranscribe [Computer software]. https://doi.org/10.5281/zenodo.20515526
+>
+> To cite a specific version, use the DOI of that version, listed on Zenodo.
 
 ---
 

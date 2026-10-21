@@ -7,7 +7,7 @@
 
 ---
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515526.svg)](https://doi.org/10.5281/zenodo.20515526)
 
 도움이 되셨다면 **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** 를 눌러주세요 — 큰 힘이 됩니다!
 

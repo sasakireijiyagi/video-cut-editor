@@ -7,7 +7,7 @@
 
 ---
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515527.svg)](https://doi.org/10.5281/zenodo.20515527)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20515526.svg)](https://doi.org/10.5281/zenodo.20515526)
 
 役に立ったら **[⭐ Star](https://github.com/sasakireijiyagi/video-cut-editor)** をつけてもらえると励みになります！
 
@@ -438,7 +438,9 @@ whisperが発話として認識した区間だけをつなげた動画が出力�
 
 研究等でご利用の際は、以下のように引用してください：
 
-> 佐々木玲仁 (2026). おまかせ文字起こし (EasyTranscribe) [Computer software]. https://doi.org/10.5281/zenodo.20515527
+> 佐々木玲仁 (2026). おまかせ文字起こし (EasyTranscribe) [Computer software]. https://doi.org/10.5281/zenodo.20515526
+>
+> 特定のバージョンを引用する場合は、そのバージョンのDOIを Zenodo でご確認ください。
 
 ---
 
