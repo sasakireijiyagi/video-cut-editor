@@ -689,8 +689,10 @@ if sys.platform != 'win32':
         os.environ['PATH'] = ''
         _lb = Path(_tmp_home) / '.local' / 'bin'
         _lb.mkdir(parents=True)
-        check('検査そのものが効いている（置く前は見つからない）',
-              m._find_mlx_whisper() == '')
+        # /opt の conda は HOME に関係なく探されるので，そこに入っている Mac では飛ばす
+        if not any(Path(b).exists() for b in ('/opt/anaconda3', '/opt/miniconda3')):
+            check('検査そのものが効いている（置く前は見つからない）',
+                  m._find_mlx_whisper() == '')
         for _n in ('mlx_whisper', 'whisper'):
             (_lb / _n).write_text('#!/bin/sh\n')
             (_lb / _n).chmod(0o755)

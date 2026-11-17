@@ -1709,8 +1709,12 @@ class SetupWorker(QThread):
                                     if hits:
                                         py = str(hits[-1])
                         if not py:
-                            self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
-                            self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。')
+                            self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。'
+                                       if _lang == 'ja' else
+                                       'Python was not found. Please install it from https://www.python.org')
+                            self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。'
+                                       if _lang == 'ja' else
+                                       'After installing it, reopen this app; the Setup window appears again.')
                             self.finished.emit(False)
                             return
 
@@ -1740,8 +1744,12 @@ class SetupWorker(QThread):
                     return
 
                 if not py:
-                    self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
-                    self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。')
+                    self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。'
+                                       if _lang == 'ja' else
+                                       'Python was not found. Please install it from https://www.python.org')
+                    self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。'
+                                       if _lang == 'ja' else
+                                       'After installing it, reopen this app; the Setup window appears again.')
                     self.finished.emit(False)
                     return
                 cmd = [py, '-m', 'pip', 'install', pkg]

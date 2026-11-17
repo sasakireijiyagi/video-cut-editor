@@ -47,8 +47,9 @@ Click the **❤ Support Development** button in the top-right corner of the app.
 
 ## First-time setup (installer version)
 
-The first time you open the app, a "Setup" window appears if components it needs (ffmpeg and Whisper) are missing.
-Click **Install** and the app installs them automatically.
+The first time you open the app, a window titled 「セットアップ」 (Setup) appears if components it needs (ffmpeg and Whisper) are missing.
+This window is always shown in Japanese. Click 「インストール」 (Install), the left button; 「スキップ」 means Skip.
+The app then installs the components automatically.
 
 **If a small window from Apple appears on your Mac**
 
@@ -57,10 +58,11 @@ On a new Mac, a window like this may appear during setup:
 > The "xcode-select" command requires the command line developer tools.
 
 This installs an official component from Apple.
+At the same time, the app shows a message titled 「あと一歩です」 (Almost there). Click OK there, then look for Apple's window.
 
 1. Click **Install** in that window (not "Get Xcode"). On the next screen, click "Agree".
 2. After 10–20 minutes, it says the software was installed.
-3. Quit and reopen the app. The "Setup" window appears again; click **Install**.
+3. Quit and reopen the app. The 「セットアップ」 (Setup) window appears again; click 「インストール」 (Install).
 
 The window may be hidden behind other windows.
 If you cannot find it, wait a moment and go to step 3.
@@ -158,7 +160,7 @@ python editor.py
 
 ---
 
-## Launch — Mac
+## Launch — Mac (running from source)
 
 After setup, double-click **`EasyTranscribe.app`**.
 
