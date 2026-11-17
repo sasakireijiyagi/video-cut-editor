@@ -642,8 +642,10 @@ check('Whisper の導入中に「手動で」の行を出さない（成功す�
       'うまくいかない場合は手動で' not in _inspect.getsource(m.SetupWorker.run))
 _home = os.path.expanduser('~')
 check('記録欄に出すパスのホームを ~ に置き換える（区切りまで見る）',
-      m._hide_home(f'{_home}/miniconda3/bin/python3') == '~/miniconda3/bin/python3'
-      and m._hide_home(f'{_home}x/bin/python3') == f'{_home}x/bin/python3'
+      m._hide_home(os.path.join(_home, 'miniconda3', 'python3'))
+          == os.path.join('~', 'miniconda3', 'python3')
+      and m._hide_home(os.path.join(_home + 'x', 'python3'))
+          == os.path.join(_home + 'x', 'python3')
       and m._hide_home('/usr/bin/python3') == '/usr/bin/python3')
 check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
       'progress=self._emit_download_progress' in _inspect.getsource(m.SetupWorker.run))
