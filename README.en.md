@@ -47,24 +47,29 @@ Click the **❤ Support Development** button in the top-right corner of the app.
 
 ## First-time setup (installer version)
 
-The first time you transcribe, the app installs the components it needs (ffmpeg and Whisper) automatically.
-When you see "The following software was not found", click **Install**.
+The first time you open the app, a "Setup" window appears if components it needs (ffmpeg and Whisper) are missing.
+Click **Install** and the app installs them automatically.
 
 **If a small window from Apple appears on your Mac**
 
 On a new Mac, a window like this may appear during setup:
 
-> "The "xcode-select" command requires the command line developer tools."
+> The "xcode-select" command requires the command line developer tools.
 
 This installs an official component from Apple.
 
 1. Click **Install** in that window (not "Get Xcode"). On the next screen, click "Agree".
 2. After 10–20 minutes, it says the software was installed.
-3. Quit and reopen the app, then run Setup again.
+3. Quit and reopen the app. The "Setup" window appears again; click **Install**.
 
 The window may be hidden behind other windows.
-If you cannot find it, wait a moment, reopen the app, and run Setup again.
+If you cannot find it, wait a moment and go to step 3.
 If asked for a password, enter the one you use to log in to your Mac.
+
+**On Windows**
+
+Extract the ZIP first, then double-click `EasyTranscribe.exe`.
+If "Windows protected your PC" appears the first time, click "More info" → "Run anyway".
 
 ---
 
@@ -123,11 +128,9 @@ A terminal will open and run setup automatically. Press Enter when done.
 > **"Developer cannot be verified" message?**  
 > Right-click the file → Open → Open.
 
-## Setup — Windows
+## Setup — Windows (running from source)
 
-> **Using the installer version (recommended)?**
-> Just extract the ZIP and double-click `EasyTranscribe.exe` — **none of the steps below are needed.**
-> The following instructions are **for developers who want to run from source code only**.
+> If you use the installer, see "On Windows" under "First-time setup (installer version)" above.
 
 
 ### 1. Install ffmpeg
