@@ -1072,10 +1072,19 @@ def _macos_clt_installed() -> bool:
         return False
 
 
+def _hide_home(text: str) -> str:
+    """記録欄に出す文の中のホームフォルダ（ユーザー名を含む）を ~ に置き換える。
+    /Users/abc と /Users/abcd を取り違えないよう，区切りの / まで見る。"""
+    home = os.path.expanduser('~')
+    if not home or home == os.sep:
+        return text
+    return text.replace(home + os.sep, '~' + os.sep)
+
+
 def _request_macos_clt() -> None:
     """Xcodeコマンドラインツールの導入をOSに依頼する（Apple純正のダイアログが出る）。
 
-    管理者パスワードは不要で、GUIアプリからでも呼べる。Homebrew と違い
+    GUIアプリからでも呼べる（環境によっては Mac のパスワードを聞かれることがある）。Homebrew と違い
     制御端末を要求しないため、ここは自動化できる。
     """
     subprocess.Popen(['xcode-select', '--install'],
@@ -1715,7 +1724,9 @@ class SetupWorker(QThread):
                     cmd,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 for line in proc.stdout:
-                    self.log_line.emit(line.rstrip())
+                    # 失敗時は「この画面を写真に撮って」と頼むので，pip の出力に
+                    # 混じるホームのフルパス（ユーザー名）も ~ にしておく。
+                    self.log_line.emit(_hide_home(line.rstrip()))
                 proc.wait()
 
             if sys.platform == 'win32' and self.do_ffmpeg:
@@ -1739,13 +1750,14 @@ class SetupWorker(QThread):
                 self.log_line.emit('ffmpeg を用意できませんでした。')
             if self.do_whisper and not _is_whisper_ok():
                 ok = False
-                self.log_line.emit('Whisper を用意できませんでした。'
-                                   '上のログにエラーの内容が出ています。')
+                # 「上のログを見て」とは書かない。直後の文で「英語の細かい表示は
+                # 読まなくてよい」と言うので，逆のことを続けて言うことになる。
+                self.log_line.emit('Whisper を用意できませんでした。' if _lang == 'ja'
+                                   else 'Whisper could not be set up.')
                 # 写真で問い合わせを受けたときの手がかり（失敗したときだけ出す）
                 # ユーザー名が写らないよう，ホームは ~ に置き換える。
                 if sys.platform != 'win32' and py:
-                    home = os.path.expanduser('~')
-                    shown = '~' + py[len(home):] if py.startswith(home + os.sep) else py
+                    shown = _hide_home(py)
                     self.log_line.emit(f'（使った Python: {shown}）' if _lang == 'ja'
                                        else f'(Python used: {shown})')
             self.finished.emit(ok and not self._ffmpeg_failed)
