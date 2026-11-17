@@ -14,7 +14,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.15"
+APP_VERSION = "1.2.16"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
