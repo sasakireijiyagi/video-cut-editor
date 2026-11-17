@@ -59,7 +59,8 @@ Apple이 배포하는 정식 구성 요소를 설치하는 창입니다.
 
 **Windows의 경우**
 
-ZIP을 압축 해제한 뒤 `EasyTranscribe.exe`를 더블 클릭하세요.
+ZIP을 **반드시 압축 해제한 뒤** `EasyTranscribe.exe`를 더블 클릭하세요.
+ZIP 안에 있는 채로 exe를 열면 경고가 나올 수 있습니다.
 처음 열 때 "Windows의 PC 보호" 화면이 나오면 "추가 정보" → "실행"을 누르세요.
 
 ---

@@ -59,7 +59,8 @@
 
 **Windows 的情况**
 
-请先解压 ZIP，再双击 `EasyTranscribe.exe`。
+请**务必先解压 ZIP**，再双击 `EasyTranscribe.exe`。
+如果在 ZIP 里直接打开 exe，可能会出现警告。
 首次打开时如果出现"Windows 已保护你的电脑"，请点击"更多信息"→"仍要运行"。
 
 ---

@@ -9,7 +9,7 @@ Fully local · Free · No service shutdown risk. Mac / Windows supported.
 
 ## Download (Installer)
 
-Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/en.html)** — no Python installation required! (On some Macs, Apple asks to install a component the first time; see "First-time setup" below.)
+Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/en.html)** — no Python installation required! (On some Macs, Apple asks to install a component the first time; see "First-time setup (installer version)" below.)
 
 ---
 
@@ -68,7 +68,8 @@ If asked for a password, enter the one you use to log in to your Mac.
 
 **On Windows**
 
-Extract the ZIP first, then double-click `EasyTranscribe.exe`.
+**Be sure to extract the ZIP first**, then double-click `EasyTranscribe.exe`.
+Opening the exe while it is still inside the ZIP may show a warning.
 If "Windows protected your PC" appears the first time, click "More info" → "Run anyway".
 
 ---
