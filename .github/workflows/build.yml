@@ -25,7 +25,7 @@ jobs:
 
       - name: Run regression checks
         # 退行テスト（tests/run_checks.py）。1つでも落ちたらビルドもリリースも作らない。
-        # これが Windows 実機（GitHub のランナー）での検証を兼ねる
+        # これが Mac 実機（GitHub のランナー）での検証を兼ねる
         run: python tests/run_checks.py
 
       - name: Build app

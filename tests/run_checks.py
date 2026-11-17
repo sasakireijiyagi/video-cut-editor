@@ -647,6 +647,13 @@ check('記録欄に出すパスのホームを ~ に置き換える（区切り�
       and m._hide_home(os.path.join(_home + 'x', 'python3'))
           == os.path.join(_home + 'x', 'python3')
       and m._hide_home('/usr/bin/python3') == '/usr/bin/python3')
+if sys.platform == 'win32':
+    # pip は場所を小文字にして出す。/ 区切りも混じる。
+    check('Windows: 小文字や / 区切りのパスでもホームを ~ にする',
+          m._hide_home(_home.lower() + '\\appdata\\x').startswith('~')
+          and m._hide_home(_home.replace('\\', '/') + '/x').startswith('~'),
+          repr((m._hide_home(_home.lower() + '\\appdata\\x'),
+                m._hide_home(_home.replace('\\', '/') + '/x'))))
 check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
       'progress=self._emit_download_progress' in _inspect.getsource(m.SetupWorker.run))
 

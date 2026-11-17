@@ -1078,6 +1078,12 @@ def _hide_home(text: str) -> str:
     home = os.path.expanduser('~')
     if not home or home == os.sep:
         return text
+    if sys.platform == 'win32':
+        # pip は場所を normcase して小文字で出す（c:\users\taro\...）。
+        # 区切りも / が混じるので，大文字小文字と区切りを区別せずに置き換える。
+        parts = [re.escape(p) for p in re.split(r'[\\/]+', home.rstrip('\\/'))]
+        pat = r'[\\/]'.join(parts) + r'[\\/]'
+        return re.sub(pat, lambda _m: '~' + os.sep, text, flags=re.IGNORECASE)
     return text.replace(home + os.sep, '~' + os.sep)
 
 
@@ -1616,7 +1622,8 @@ class SetupWorker(QThread):
                     else:
                         self.log_line.emit('✓ ffmpeg の準備ができました（字幕焼き込みにも対応）。')
                 except Exception as e:
-                    self.log_line.emit(f'自動取得に失敗しました: {e}')
+                    self.log_line.emit(_hide_home(f'自動取得に失敗しました: {e}' if _lang == 'ja'
+                                                  else f'Automatic download failed: {e}'))
                     self._ffmpeg_failed = True
                     self.ffmpeg_manual.emit()
 
@@ -1644,7 +1651,10 @@ class SetupWorker(QThread):
                         self.log_line.emit(line.rstrip())
                     proc.wait()
                 else:
-                    self.log_line.emit('wingetが見つかりません。手動でインストールしてください。')
+                    self.log_line.emit('winget が無いため，ffmpeg を自動で入れられませんでした。'
+                                       '次のページから ffmpeg を入れてください。' if _lang == 'ja'
+                                       else 'winget is not available, so ffmpeg could not be installed '
+                                       'automatically. Please install ffmpeg from this page:')
                     self.log_line.emit('https://ffmpeg.org/download.html')
 
             if self.do_whisper:
@@ -1747,7 +1757,8 @@ class SetupWorker(QThread):
             check_ffmpeg = self.do_ffmpeg and sys.platform != 'win32'
             if check_ffmpeg and not _is_ffmpeg_ok():
                 ok = False
-                self.log_line.emit('ffmpeg を用意できませんでした。')
+                self.log_line.emit('ffmpeg を用意できませんでした。' if _lang == 'ja'
+                                   else 'ffmpeg could not be set up.')
             if self.do_whisper and not _is_whisper_ok():
                 ok = False
                 # 「上のログを見て」とは書かない。直後の文で「英語の細かい表示は
@@ -1762,7 +1773,7 @@ class SetupWorker(QThread):
                                        else f'(Python used: {shown})')
             self.finished.emit(ok and not self._ffmpeg_failed)
         except Exception as e:
-            self.log_line.emit(str(e))
+            self.log_line.emit(_hide_home(str(e)))
             self.finished.emit(False)
 
 _SUBTITLES_FILTER_CACHE = None
