@@ -654,6 +654,23 @@ if sys.platform == 'win32':
           and m._hide_home(_home.replace('\\', '/') + '/x').startswith('~'),
           repr((m._hide_home(_home.lower() + '\\appdata\\x'),
                 m._hide_home(_home.replace('\\', '/') + '/x'))))
+# 旧エンジンから mlx-whisper へ入れ直す人で，pip が失敗したのに
+# 「インストール完了！」と出ていた（旧 whisper があると成功扱いになった）。
+_saved = (m._IS_APPLE_SILICON, m.MLX_WHISPER_BIN, m.WHISPER_BIN)
+try:
+    m._IS_APPLE_SILICON = True
+    m.MLX_WHISPER_BIN = ''
+    m.WHISPER_BIN = sys.executable          # 実在するファイル＝旧エンジンがある状態
+    check('検査そのものが効いている（旧エンジンがあると _is_whisper_ok は True）',
+          m._is_whisper_ok())
+    check('Apple Silicon で mlx が入っていなければ，入れ直しは成功扱いにしない',
+          not m._whisper_setup_ok())
+    m.MLX_WHISPER_BIN = sys.executable
+    check('mlx が入っていれば成功扱い', m._whisper_setup_ok())
+finally:
+    m._IS_APPLE_SILICON, m.MLX_WHISPER_BIN, m.WHISPER_BIN = _saved
+check('セットアップの成否判定がこの関数を使っている（受け渡しを見る）',
+      '_whisper_setup_ok()' in _inspect.getsource(m.SetupWorker.run))
 check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
       'progress=self._emit_download_progress' in _inspect.getsource(m.SetupWorker.run))
 

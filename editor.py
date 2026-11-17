@@ -1326,6 +1326,21 @@ def _is_whisper_ok() -> bool:
             return True
     return False
 
+def _whisper_setup_ok() -> bool:
+    """セットアップで Whisper を入れ終えたかの判定。
+
+    Apple Silicon で入れるのは mlx-whisper なので，mlx_whisper が見つかることを
+    根拠にする。_is_whisper_ok() は mlx が無いと旧 openai-whisper を見るため，
+    旧エンジンから入れ直す人（upgrade）では pip が失敗しても True になり，
+    「インストール完了！」と出たのに再起動でまた勧めが出る往復になっていた。"""
+    if _IS_APPLE_SILICON:
+        b = MLX_WHISPER_BIN
+        if not b:
+            return False
+        return os.path.exists(b) if os.sep in b else bool(shutil.which(b))
+    return _is_whisper_ok()
+
+
 def _manual_ffmpeg_command() -> str:
     """手動インストール用のコマンドを組み立てる。
 
@@ -1759,7 +1774,7 @@ class SetupWorker(QThread):
                 ok = False
                 self.log_line.emit('ffmpeg を用意できませんでした。' if _lang == 'ja'
                                    else 'ffmpeg could not be set up.')
-            if self.do_whisper and not _is_whisper_ok():
+            if self.do_whisper and not _whisper_setup_ok():
                 ok = False
                 # 「上のログを見て」とは書かない。直後の文で「英語の細かい表示は
                 # 読まなくてよい」と言うので，逆のことを続けて言うことになる。
