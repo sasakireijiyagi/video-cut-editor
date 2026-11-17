@@ -17,8 +17,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        # 版を固定する。固定していなかったため PyQt6 6.12 が勝手に入り，
+        # Mac のビルドが COLLECT の段で落ちた（v1.2.15, 2026-11-17）。
+        # 上げるときは手元で両OSのビルドを確かめてから。
         run: |
-          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
+          pip install pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8 PyQt6==6.11.0 PyQt6-Qt6==6.11.2 PyQt6-sip==13.13.0 certifi
 
       - name: Run regression checks
         # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
@@ -70,8 +73,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        # 版を固定する。固定していなかったため PyQt6 6.12 が勝手に入り，
+        # Mac のビルドが COLLECT の段で落ちた（v1.2.15, 2026-11-17）。
+        # 上げるときは手元で両OSのビルドを確かめてから。
         run: |
-          pip install pyinstaller PyQt6 PyQt6-Qt6 PyQt6-sip certifi
+          pip install pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8 PyQt6==6.11.0 PyQt6-Qt6==6.11.2 PyQt6-sip==13.13.0 certifi
 
       - name: Run regression checks
         # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
