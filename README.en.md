@@ -9,7 +9,7 @@ Fully local · Free · No service shutdown risk. Mac / Windows supported.
 
 ## Download (Installer)
 
-Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/en.html)** — no Python installation required!
+Visit the **[Download Page](https://sasakireijiyagi.github.io/video-cut-editor/en.html)** — no Python installation required! (On some Macs, Apple asks to install a component the first time; see "First-time setup" below.)
 
 ---
 
@@ -42,6 +42,29 @@ This tool is developed and maintained by a researcher at Kyushu University in hi
 It has now reached users around the world.
 If it has helped your research or work, **even a small donation — the price of a coffee — would be a huge encouragement** ☕  
 Click the **❤ Support Development** button in the top-right corner of the app.
+
+---
+
+## First-time setup (installer version)
+
+The first time you transcribe, the app installs the components it needs (ffmpeg and Whisper) automatically.
+When you see "The following software was not found", click **Install**.
+
+**If a small window from Apple appears on your Mac**
+
+On a new Mac, a window like this may appear during setup:
+
+> "The "xcode-select" command requires the command line developer tools."
+
+This installs an official component from Apple.
+
+1. Click **Install** in that window (not "Get Xcode"). On the next screen, click "Agree".
+2. After 10–20 minutes, it says the software was installed.
+3. Quit and reopen the app, then run Setup again.
+
+The window may be hidden behind other windows.
+If you cannot find it, wait a moment, reopen the app, and run Setup again.
+If asked for a password, enter the one you use to log in to your Mac.
 
 ---
 
@@ -78,14 +101,16 @@ Whisper supports **100 languages** for transcription. The app's language selecto
 
 ---
 
-## Requirements
+## Requirements (running from source)
+
+**The "Requirements", "Setup" and "Launch" sections below are for developers running from source. If you use the installer, you can skip them.**
 
 - [Anaconda](https://www.anaconda.com/download) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 - Internet connection (first-time setup only)
 
 ---
 
-## Setup — Mac
+## Setup — Mac (running from source)
 
 Double-click **「セットアップ.command」** in the distribution folder.  
 A terminal will open and run setup automatically. Press Enter when done.
