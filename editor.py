@@ -957,6 +957,10 @@ def _find_whisper() -> str:
                    key=lambda p: _ver_key(p.parent.parent.name))
         if hits:
             return str(hits[-1])
+        # framework 版でない Python（conda の base など）に --user で入れた先
+        w_local = Path.home() / '.local' / 'bin' / 'whisper'
+        if w_local.exists():
+            return str(w_local)
     return 'whisper'
 
 def _find_mlx_whisper() -> str:
@@ -983,6 +987,11 @@ def _find_mlx_whisper() -> str:
                    key=lambda p: _ver_key(p.parent.parent.name))
     if hits:
         return str(hits[-1])
+    # framework 版でない Python（conda の base など）に --user で入れた先。
+    # ここを見ないと，入ったのに「失敗」と出て，起動のたびに入れ直しを勧める。
+    w_local = Path.home() / '.local' / 'bin' / 'mlx_whisper'
+    if w_local.exists():
+        return str(w_local)
     return ''
 
 FFMPEG_BIN  = _find_ffmpeg()

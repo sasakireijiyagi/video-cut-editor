@@ -669,6 +669,43 @@ try:
     check('mlx が入っていれば成功扱い', m._whisper_setup_ok())
 finally:
     m._IS_APPLE_SILICON, m.MLX_WHISPER_BIN, m.WHISPER_BIN = _saved
+_saved = (m._IS_APPLE_SILICON, m.WHISPER_BIN)
+try:
+    m._IS_APPLE_SILICON = False
+    m.WHISPER_BIN = sys.executable
+    check('Apple Silicon 以外は従来どおり（whisper があれば成功）', m._whisper_setup_ok())
+    m.WHISPER_BIN = ''
+    check('Apple Silicon 以外で whisper が無ければ失敗', not m._whisper_setup_ok())
+finally:
+    m._IS_APPLE_SILICON, m.WHISPER_BIN = _saved
+
+if sys.platform != 'win32':
+    # conda の base などに --user で入れると ~/.local/bin に入る。
+    # ここを探さないと，入ったのに「失敗」と出て勧めが毎回出る。
+    _tmp_home = tempfile.mkdtemp()
+    _saved_env = {k: os.environ.get(k) for k in ('HOME', 'PATH')}
+    try:
+        os.environ['HOME'] = _tmp_home
+        os.environ['PATH'] = ''
+        _lb = Path(_tmp_home) / '.local' / 'bin'
+        _lb.mkdir(parents=True)
+        check('検査そのものが効いている（置く前は見つからない）',
+              m._find_mlx_whisper() == '')
+        for _n in ('mlx_whisper', 'whisper'):
+            (_lb / _n).write_text('#!/bin/sh\n')
+            (_lb / _n).chmod(0o755)
+        check('~/.local/bin の mlx_whisper を見つける',
+              m._find_mlx_whisper() == str(_lb / 'mlx_whisper'), m._find_mlx_whisper())
+        check('~/.local/bin の whisper を見つける',
+              m._find_whisper() == str(_lb / 'whisper'), m._find_whisper())
+    finally:
+        for k, v in _saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        import shutil as _sh2
+        _sh2.rmtree(_tmp_home, ignore_errors=True)
 check('セットアップの成否判定がこの関数を使っている（受け渡しを見る）',
       '_whisper_setup_ok()' in _inspect.getsource(m.SetupWorker.run))
 check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
