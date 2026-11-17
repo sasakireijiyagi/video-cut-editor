@@ -622,7 +622,7 @@ try:
     check('検査そのものが効いている（本当の失敗では，うまくいかなかったと書く）',
           'うまくいきませんでした' in _dlg2.log.toPlainText(), _dlg2.log.toPlainText())
     check('本当の失敗でも「手動でインストール」とだけ書いて突き放さない',
-          '手動' not in _dlg2.log.toPlainText() and 'もう一度セットアップ' in _dlg2.log.toPlainText(),
+          '手動' not in _dlg2.log.toPlainText() and 'セットアップの画面' in _dlg2.log.toPlainText(),
           _dlg2.log.toPlainText())
 finally:
     m._lang = _saved_lang
@@ -708,6 +708,12 @@ if sys.platform != 'win32':
         _sh2.rmtree(_tmp_home, ignore_errors=True)
 check('セットアップの成否判定がこの関数を使っている（受け渡しを見る）',
       '_whisper_setup_ok()' in _inspect.getsource(m.SetupWorker.run))
+# 「セットアップを実行」するメニューは無い（開き直すと画面が自動で出る）。
+# 以前は存在しない「ヘルプ」メニューの項目を指していた。
+_src = EDITOR.read_text(encoding='utf-8')
+check('存在しないメニューやセットアップの実行を案内しない',
+      'セットアップを実行' not in _src and 'run Setup' not in _src
+      and 'Setup from the Help menu' not in _src)
 check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
       'progress=self._emit_download_progress' in _inspect.getsource(m.SetupWorker.run))
 

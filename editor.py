@@ -1535,14 +1535,13 @@ class SetupDialog(QDialog):
                     '　「"xcode-select"コマンドを実行するには、\n'
                     '　　コマンドライン・デベロッパ・ツールが必要です。」\n'
                     '　ほかのウィンドウの後ろに隠れていることがあります。\n'
-                    '　見当たらないときは，少し待ってからこのアプリを開き直し，\n'
-                    '　もう一度セットアップを実行してください。\n\n'
+                    '　見当たらないときは，少し待ってから手順4へ進んでください。\n\n'
                     '2. その窓の「インストール」を押します。\n'
                     '　（「Xcodeを入手」ではありません）\n'
                     '　続く画面では「同意する」を押します。\n\n'
                     '3. 10〜20分ほどで「ソフトウェアがインストールされました」と出ます。\n\n'
-                    '4. このアプリをいったん終了して開き直し，\n'
-                    '　もう一度セットアップを実行してください。\n\n'
+                    '4. このアプリをいったん終了して開き直します。\n'
+                    '　セットアップの画面がもう一度出るので，「インストール」を押します。\n\n'
                     '・Apple が配布している正規のものです\n'
                     '・Mac のパスワードを聞かれたら，ふだん Mac に入るときの\n'
                     '　パスワードを入れてください')
@@ -1553,12 +1552,12 @@ class SetupDialog(QDialog):
                     '   "The xcode-select command requires the command line\n'
                     '    developer tools."\n'
                     '   It may be hidden behind other windows.\n'
-                    '   If you cannot find it, wait a moment, reopen this app,\n'
-                    '   and run Setup again.\n\n'
+                    '   If you cannot find it, wait a moment and go to step 4.\n\n'
                     '2. Click "Install" in that window (not "Get Xcode").\n'
                     '   On the next screen, click "Agree".\n\n'
                     '3. After 10-20 minutes, it says the software was installed.\n\n'
-                    '4. Quit and reopen this app, then run Setup again.\n\n'
+                    '4. Quit and reopen this app. The Setup window appears again;\n'
+                    '   click "Install".\n\n'
                     '- It comes from Apple and is safe.\n'
                     '- If asked for a password, enter the one you use to log in to this Mac.')
         QMessageBox.information(self, title, body)
@@ -1581,10 +1580,10 @@ class SetupDialog(QDialog):
         elif self._clt_pending:
             # Apple の部品を入れてもらう途中で止めただけで，失敗ではない。
             # ここで「エラー」「手動で」と書くと，Python を自分で入れに行かせてしまう。
-            msg = ('Apple の部品のインストールが終わったら，このアプリを開き直して，'
-                   'もう一度セットアップを実行してください。' if _lang == 'ja' else
-                   'When the Apple component has finished installing, reopen this app '
-                   'and run Setup again.')
+            msg = ('Apple の部品のインストールが終わったら，このアプリを開き直してください。'
+                   'セットアップの画面がもう一度出るので，「インストール」を押します。' if _lang == 'ja' else
+                   'When the Apple component has finished installing, reopen this app. '
+                   'The Setup window appears again; click "Install".')
             self.log.append(msg)
             self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
         else:
@@ -1594,14 +1593,14 @@ class SetupDialog(QDialog):
                    '（「〜してください」）が出ていれば，それに従ってください。'
                    '英語の細かい表示は読まなくてかまいません。\n'
                    '案内が無いときは，インターネットにつながっているか確かめて，'
-                   'このアプリを開き直し，もう一度セットアップを実行してください。\n'
+                   'このアプリを開き直してください（セットアップの画面がもう一度出ます）。\n'
                    'それでも同じところで止まるときは，この画面を写真に撮って，'
                    'アプリを教えてくれた人か配布元に見せてください。'
                    if _lang == 'ja' else
                    'Setup did not finish. If this app showed instructions above, follow them. '
                    'You do not need to act on the technical messages.\n'
-                   'Otherwise, check your internet connection, reopen this app, '
-                   'and run Setup again.\nIf it stops at the same place, take a photo of '
+                   'Otherwise, check your internet connection and reopen this app '
+                   '(the Setup window appears again).\nIf it stops at the same place, take a photo of '
                    'this window and show it to whoever told you about the app or to the developer.')
             self.log.append(msg)
             self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
@@ -1711,7 +1710,7 @@ class SetupWorker(QThread):
                                         py = str(hits[-1])
                         if not py:
                             self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
-                            self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
+                            self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。')
                             self.finished.emit(False)
                             return
 
@@ -1742,7 +1741,7 @@ class SetupWorker(QThread):
 
                 if not py:
                     self.log_line.emit('Pythonが見つかりません。https://www.python.org からインストールしてください。')
-                    self.log_line.emit('インストール後にアプリを再起動してセットアップを実行してください。')
+                    self.log_line.emit('インストール後にアプリを開き直すと，セットアップの画面がもう一度出ます。')
                     self.finished.emit(False)
                     return
                 cmd = [py, '-m', 'pip', 'install', pkg]
@@ -5409,9 +5408,9 @@ class MainWindow(QMainWindow):
     def _transcribe(self):
         if not _is_whisper_ok():
             QMessageBox.warning(self, tr('err_title'),
-                'Whisperがインストールされていません。\nメニュー「ヘルプ」からセットアップを実行してください。'
+                'Whisperがインストールされていません。\nこのアプリを開き直すと，セットアップの画面が出ます。'
                 if _lang == 'ja' else
-                'Whisper is not installed.\nRun Setup from the Help menu.')
+                'Whisper is not installed.\nReopen this app to show the Setup window.')
             return
         model = self.cmb_model.currentText().lstrip('★ ').split(' ')[0]
         lang  = _lang_code_of(self.cmb_lang.currentText())
