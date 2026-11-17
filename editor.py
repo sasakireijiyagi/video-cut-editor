@@ -14,7 +14,7 @@ import platform
 os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
 
-APP_VERSION = "1.2.14"
+APP_VERSION = "1.2.15"
 GITHUB_REPO = "sasakireijiyagi/video-cut-editor"
 
 # PyQt6 プラグインパスをインポート前に解決（conda 環境対応）
@@ -1457,6 +1457,7 @@ class SetupDialog(QDialog):
         self.btn_skip.clicked.connect(self.reject)
 
         self._worker = None
+        self._clt_pending = False   # Apple の部品の導入を頼んだ途中か
 
     def _run_install(self):
         self.btn_install.setEnabled(False)
@@ -1482,26 +1483,44 @@ class SetupDialog(QDialog):
         _show_ffmpeg_manual_dialog(self)
 
     def _show_clt_notice(self):
-        """コマンドラインツールの導入を促したことを，平易な言葉で伝える。"""
+        """コマンドラインツールの導入を促したことを，平易な言葉で伝える。
+
+        「Appleの画面」と書くだけでは，どの窓か分からなかった（実際の問い合わせ）。
+        窓の文面とボタンの名前をそのまま書き，押し間違えやすい
+        「Xcodeを入手」を名指しで外す。"""
+        self._clt_pending = True   # 直後の finished(False) を「エラー」と書かないため
         if _lang == 'ja':
             title = 'あと一歩です'
-            body = ('文字起こしの準備に必要な部品が，このMacにまだありません。\n\n'
-                    'Appleの「コマンドラインツールをインストール」という画面が\n'
-                    '出ましたか？ 出ていれば「インストール」を押してください。\n\n'
-                    '・Appleが配布している正規のものです\n'
-                    '・パスワードの入力は不要です\n'
-                    '・容量が大きいため，10〜20分ほどかかります\n\n'
-                    '終わったら，このアプリをいったん終了して開き直し，\n'
-                    'もう一度セットアップを実行してください。')
+            body = ('Whisper を入れる前に，Apple の部品をひとつ入れる必要があります。\n\n'
+                    '1. 次のような文の，小さな窓が出ているはずです。\n'
+                    '　「"xcode-select"コマンドを実行するには、\n'
+                    '　　コマンドライン・デベロッパ・ツールが必要です。」\n'
+                    '　ほかのウィンドウの後ろに隠れていることがあります。\n'
+                    '　見当たらないときは，少し待ってからこのアプリを開き直し，\n'
+                    '　もう一度セットアップを実行してください。\n\n'
+                    '2. その窓の「インストール」を押します。\n'
+                    '　（「Xcodeを入手」ではありません）\n'
+                    '　続く画面では「同意する」を押します。\n\n'
+                    '3. 10〜20分ほどで「ソフトウェアがインストールされました」と出ます。\n\n'
+                    '4. このアプリをいったん終了して開き直し，\n'
+                    '　もう一度セットアップを実行してください。\n\n'
+                    '・Apple が配布している正規のものです\n'
+                    '・パスワードの入力は不要です')
         else:
             title = 'Almost there'
-            body = ('A component required for transcription is not on this Mac yet.\n\n'
-                    'Did a window titled "Install Command Line Developer Tools" appear?\n'
-                    'If so, click Install.\n\n'
+            body = ('Before installing Whisper, one component from Apple is needed.\n\n'
+                    '1. A small window should be open, saying something like:\n'
+                    '   "The xcode-select command requires the command line\n'
+                    '    developer tools."\n'
+                    '   It may be hidden behind other windows.\n'
+                    '   If you cannot find it, wait a moment, reopen this app,\n'
+                    '   and run Setup again.\n\n'
+                    '2. Click "Install" in that window (not "Get Xcode").\n'
+                    '   On the next screen, click "Agree".\n\n'
+                    '3. After 10-20 minutes, it says the software was installed.\n\n'
+                    '4. Quit and reopen this app, then run Setup again.\n\n'
                     '- It comes from Apple and is safe.\n'
-                    '- No password is required.\n'
-                    '- It is large, so it takes 10-20 minutes.\n\n'
-                    'When it finishes, quit and reopen this app, then run Setup again.')
+                    '- No password is required.')
         QMessageBox.information(self, title, body)
 
     def _on_done(self, success: bool):
@@ -1519,9 +1538,30 @@ class SetupDialog(QDialog):
                 msg = 'インストール完了！アプリを再起動してください。' if _lang == 'ja' else 'Installation complete! Please restart the app.'
             self.log.append(msg)
             self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
-        else:
-            msg = 'エラーが発生しました。手動でインストールしてください。' if _lang == 'ja' else 'An error occurred. Please install manually.'
+        elif self._clt_pending:
+            # Apple の部品を入れてもらう途中で止めただけで，失敗ではない。
+            # ここで「エラー」「手動で」と書くと，Python を自分で入れに行かせてしまう。
+            msg = ('Apple の部品のインストールが終わったら，このアプリを開き直して，'
+                   'もう一度セットアップを実行してください。' if _lang == 'ja' else
+                   'When the Apple component has finished installing, reopen this app '
+                   'and run Setup again.')
             self.log.append(msg)
+            self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
+        else:
+            # 「手動でインストールしてください」は，何を・どこから入れるのかが
+            # 書いておらず，素人には次の一手にならなかった。
+            msg = ('うまくいきませんでした。上に案内が出ていれば，それに従ってください。\n'
+                   '案内が無いときは，インターネットにつながっているか確かめて，'
+                   'このアプリを開き直し，もう一度セットアップを実行してください。\n'
+                   'それでも同じところで止まるときは，この画面を写真に撮って，'
+                   'アプリを教えてくれた人か配布元に見せてください。'
+                   if _lang == 'ja' else
+                   'Setup did not finish. If there are instructions above, follow them.\n'
+                   'Otherwise, check your internet connection, reopen this app, '
+                   'and run Setup again.\nIf it stops at the same place, take a photo of '
+                   'this window and show it to whoever told you about the app or to the developer.')
+            self.log.append(msg)
+            self.btn_skip.setText('閉じる' if _lang == 'ja' else 'Close')
 
 
 class SetupWorker(QThread):
@@ -1535,8 +1575,20 @@ class SetupWorker(QThread):
         self.do_ffmpeg  = ffmpeg
         self.do_whisper = whisper
         self._ffmpeg_failed = False
+        self._last_progress_step = -1
+
+    def _emit_download_progress(self, p: int):
+        """ダウンロードの進み具合を10%刻みで，同じ値は1度だけ記録欄に出す。
+        以前は25%刻みで塊ごとに出していたため「25%」が何行も並び，
+        次の50%まで何も変わらず「止まった」と受け取られた。"""
+        step = min(p, 100) // 10
+        if step == self._last_progress_step:
+            return
+        self._last_progress_step = step
+        self.log_line.emit(f'  {step * 10}%')
 
     def run(self):
+        py = ''   # 失敗時に記録欄へ出すため，どの経路でも定義しておく
         try:
             if self.do_ffmpeg and sys.platform == 'darwin':
                 # Homebrew は使わない。GUIアプリからは公式インストーラの確認
@@ -1545,7 +1597,7 @@ class SetupWorker(QThread):
                 try:
                     path = _install_ffmpeg_macos(
                         log=self.log_line.emit,
-                        progress=lambda p: self.log_line.emit(f'  {p}%') if p % 25 == 0 else None)
+                        progress=self._emit_download_progress)
                     if not _ffmpeg_has_libass(path):
                         self.log_line.emit('⚠️ このビルドは字幕焼き込みに対応していません。')
                     else:
@@ -1630,8 +1682,8 @@ class SetupWorker(QThread):
                 # 素のMacには使えるPythonが無い。/usr/bin/python3 はコマンドライン
                 # ツール未導入だと実体がなく、実行してもインストーラを出すだけ。
                 if not py and sys.platform == 'darwin' and not _macos_clt_installed():
-                    self.log_line.emit('Pythonを使えるようにする必要があります。')
-                    self.log_line.emit('Appleの「コマンドラインツール」のインストール画面を開きます…')
+                    self.log_line.emit('Whisper を入れる前に，Apple の部品（コマンドライン・デベロッパ・ツール）が必要です。')
+                    self.log_line.emit('Apple の小さな確認の窓を開きます（ほかのウィンドウの後ろに出ることがあります）。')
                     _request_macos_clt()
                     self.clt_requested.emit()
                     self.finished.emit(False)
@@ -1645,8 +1697,11 @@ class SetupWorker(QThread):
                 cmd = [py, '-m', 'pip', 'install', pkg]
                 if _needs_user_flag(py):
                     cmd.insert(4, '--user')   # システムPythonは --user でないと書けない
-                self.log_line.emit(f'Whisper（{pkg}）をインストール中...')
-                self.log_line.emit(f'  （うまくいかない場合は手動で: {" ".join(cmd[1:])}）')
+                # 以前は pip の手作業のコマンドを毎回ここに出していたが，
+                # 成功する人にも出て「手動で入れないといけないのか」と戸惑わせた
+                # （2026-11 実際の問い合わせ）。しかも先頭の python が抜けた
+                # 不完全なコマンドだった。素人向けの画面には出さない。
+                self.log_line.emit(f'Whisper（{pkg}）をインストール中…（数分かかります）')
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -1677,6 +1732,9 @@ class SetupWorker(QThread):
                 ok = False
                 self.log_line.emit('Whisper を用意できませんでした。'
                                    '上のログにエラーの内容が出ています。')
+                # 写真で問い合わせを受けたときの手がかり（失敗したときだけ出す）
+                if sys.platform != 'win32' and py:
+                    self.log_line.emit(f'（使った Python: {py}）')
             self.finished.emit(ok and not self._ffmpeg_failed)
         except Exception as e:
             self.log_line.emit(str(e))

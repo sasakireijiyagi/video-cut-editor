@@ -590,6 +590,59 @@ check('_child_env() の下では日本語がそのまま読める',
       repr(_r_ok.stdout.decode('utf-8', errors='replace')))
 
 # ─────────────────────────────────────────────────────────────
+print('\n[セットアップ画面の途中の文（2026-11 実際の問い合わせ）]')
+# 素の Mac で「Apple の画面」が分からず，さらに記録欄の
+# 「エラーが発生しました。手動でインストールしてください。」を見て
+# Python を自分で入れに行こうとした。Apple の部品を頼んだ途中で
+# 止めただけのときは，エラーと書かないこと。
+import inspect as _inspect
+_saved_lang = m._lang
+_saved_refresh = m._refresh_tool_paths
+_saved_info = m.QMessageBox.information
+m._lang = 'ja'
+m._refresh_tool_paths = lambda: None
+_shown = []
+m.QMessageBox.information = staticmethod(lambda *a, **k: _shown.append(a))
+try:
+    _dlg = m.SetupDialog(False, True)
+    _dlg._show_clt_notice()
+    _body = _shown[-1][2] if _shown else ''
+    check('Apple の窓の文面とボタン名を書いている',
+          'コマンドライン・デベロッパ・ツール' in _body and '「インストール」' in _body
+          and 'Xcodeを入手' in _body, _body[:80])
+    _dlg._on_done(False)
+    _log = _dlg.log.toPlainText()
+    check('Apple の部品を頼んだ途中では「エラー」「手動で」と書かない',
+          'エラー' not in _log and '手動' not in _log and '開き直して' in _log, _log)
+
+    # 鳴るかの確認: 頼んでいない本当の失敗では，従来どおりエラーと書く
+    _dlg2 = m.SetupDialog(False, True)
+    _dlg2._on_done(False)
+    check('検査そのものが効いている（本当の失敗では，うまくいかなかったと書く）',
+          'うまくいきませんでした' in _dlg2.log.toPlainText(), _dlg2.log.toPlainText())
+    check('本当の失敗でも「手動でインストール」とだけ書いて突き放さない',
+          '手動' not in _dlg2.log.toPlainText() and 'もう一度セットアップ' in _dlg2.log.toPlainText(),
+          _dlg2.log.toPlainText())
+finally:
+    m._lang = _saved_lang
+    m._refresh_tool_paths = _saved_refresh
+    m.QMessageBox.information = _saved_info
+
+# ffmpeg の進み具合は10%刻みで，同じ値を何行も並べない。
+# 以前は「25%」が何行も並んだまま50%まで変わらず，止まったと受け取られた。
+_w = m.SetupWorker(True, False)
+_lines = []
+_w.log_line.connect(_lines.append)
+for _p in (0, 0, 3, 9, 25, 25, 26, 99, 100, 100):
+    _w._emit_download_progress(_p)
+check('ダウンロードの進み具合は10%刻みで1度ずつ',
+      _lines == ['  0%', '  20%', '  90%', '  100%'], repr(_lines))
+check('Whisper の導入中に「手動で」の行を出さない（成功する人にも出ていた）',
+      'うまくいかない場合は手動で' not in _inspect.getsource(m.SetupWorker.run))
+check('ffmpeg の取得がこの表示を使っている（受け渡しを見る）',
+      'progress=self._emit_download_progress' in _inspect.getsource(m.SetupWorker.run))
+
+# ─────────────────────────────────────────────────────────────
 os.chdir('/')
 import shutil as _sh
 _sh.rmtree(work, ignore_errors=True)
