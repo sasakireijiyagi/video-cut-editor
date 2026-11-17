@@ -613,7 +613,8 @@ try:
     _dlg._on_done(False)
     _log = _dlg.log.toPlainText()
     check('Apple の部品を頼んだ途中では「エラー」「手動で」と書かない',
-          'エラー' not in _log and '手動' not in _log and '開き直して' in _log, _log)
+          'エラー' not in _log and '手動' not in _log and '開き直して' in _log
+          and 'うまくいきませんでした' not in _log, _log)
 
     # 鳴るかの確認: 頼んでいない本当の失敗では，従来どおりエラーと書く
     _dlg2 = m.SetupDialog(False, True)

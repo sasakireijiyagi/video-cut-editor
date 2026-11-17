@@ -1505,7 +1505,8 @@ class SetupDialog(QDialog):
                     '4. このアプリをいったん終了して開き直し，\n'
                     '　もう一度セットアップを実行してください。\n\n'
                     '・Apple が配布している正規のものです\n'
-                    '・パスワードの入力は不要です')
+                    '・Mac のパスワードを聞かれたら，ふだん Mac に入るときの\n'
+                    '　パスワードを入れてください')
         else:
             title = 'Almost there'
             body = ('Before installing Whisper, one component from Apple is needed.\n\n'
@@ -1520,7 +1521,7 @@ class SetupDialog(QDialog):
                     '3. After 10-20 minutes, it says the software was installed.\n\n'
                     '4. Quit and reopen this app, then run Setup again.\n\n'
                     '- It comes from Apple and is safe.\n'
-                    '- No password is required.')
+                    '- If asked for a password, enter the one you use to log in to this Mac.')
         QMessageBox.information(self, title, body)
 
     def _on_done(self, success: bool):
@@ -1550,13 +1551,16 @@ class SetupDialog(QDialog):
         else:
             # 「手動でインストールしてください」は，何を・どこから入れるのかが
             # 書いておらず，素人には次の一手にならなかった。
-            msg = ('うまくいきませんでした。上に案内が出ていれば，それに従ってください。\n'
+            msg = ('うまくいきませんでした。上に，このアプリからの日本語の案内'
+                   '（「〜してください」）が出ていれば，それに従ってください。'
+                   '英語の細かい表示は読まなくてかまいません。\n'
                    '案内が無いときは，インターネットにつながっているか確かめて，'
                    'このアプリを開き直し，もう一度セットアップを実行してください。\n'
                    'それでも同じところで止まるときは，この画面を写真に撮って，'
                    'アプリを教えてくれた人か配布元に見せてください。'
                    if _lang == 'ja' else
-                   'Setup did not finish. If there are instructions above, follow them.\n'
+                   'Setup did not finish. If this app showed instructions above, follow them. '
+                   'You do not need to act on the technical messages.\n'
                    'Otherwise, check your internet connection, reopen this app, '
                    'and run Setup again.\nIf it stops at the same place, take a photo of '
                    'this window and show it to whoever told you about the app or to the developer.')
@@ -1682,8 +1686,12 @@ class SetupWorker(QThread):
                 # 素のMacには使えるPythonが無い。/usr/bin/python3 はコマンドライン
                 # ツール未導入だと実体がなく、実行してもインストーラを出すだけ。
                 if not py and sys.platform == 'darwin' and not _macos_clt_installed():
-                    self.log_line.emit('Whisper を入れる前に，Apple の部品（コマンドライン・デベロッパ・ツール）が必要です。')
-                    self.log_line.emit('Apple の小さな確認の窓を開きます（ほかのウィンドウの後ろに出ることがあります）。')
+                    if _lang == 'ja':
+                        self.log_line.emit('Whisper を入れる前に，Apple の部品（コマンドライン・デベロッパ・ツール）が必要です。')
+                        self.log_line.emit('Apple の小さな確認の窓を開きます（ほかのウィンドウの後ろに出ることがあります）。')
+                    else:
+                        self.log_line.emit('Before installing Whisper, an Apple component (command line developer tools) is needed.')
+                        self.log_line.emit('Opening a small window from Apple (it may appear behind other windows).')
                     _request_macos_clt()
                     self.clt_requested.emit()
                     self.finished.emit(False)
@@ -1701,7 +1709,8 @@ class SetupWorker(QThread):
                 # 成功する人にも出て「手動で入れないといけないのか」と戸惑わせた
                 # （2026-11 実際の問い合わせ）。しかも先頭の python が抜けた
                 # 不完全なコマンドだった。素人向けの画面には出さない。
-                self.log_line.emit(f'Whisper（{pkg}）をインストール中…（数分かかります）')
+                self.log_line.emit(f'Whisper（{pkg}）をインストール中…（数分かかります）' if _lang == 'ja'
+                                   else f'Installing Whisper ({pkg})... (this takes a few minutes)')
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -1733,8 +1742,12 @@ class SetupWorker(QThread):
                 self.log_line.emit('Whisper を用意できませんでした。'
                                    '上のログにエラーの内容が出ています。')
                 # 写真で問い合わせを受けたときの手がかり（失敗したときだけ出す）
+                # ユーザー名が写らないよう，ホームは ~ に置き換える。
                 if sys.platform != 'win32' and py:
-                    self.log_line.emit(f'（使った Python: {py}）')
+                    home = os.path.expanduser('~')
+                    shown = '~' + py[len(home):] if py.startswith(home + os.sep) else py
+                    self.log_line.emit(f'（使った Python: {shown}）' if _lang == 'ja'
+                                       else f'(Python used: {shown})')
             self.finished.emit(ok and not self._ffmpeg_failed)
         except Exception as e:
             self.log_line.emit(str(e))

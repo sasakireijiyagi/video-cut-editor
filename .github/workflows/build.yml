@@ -24,7 +24,7 @@ jobs:
           pip install pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8 PyQt6==6.11.0 PyQt6-Qt6==6.11.2 PyQt6-sip==13.13.0 certifi
 
       - name: Run regression checks
-        # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
+        # 退行テスト（tests/run_checks.py）。1つでも落ちたらビルドもリリースも作らない。
         # これが Windows 実機（GitHub のランナー）での検証を兼ねる
         run: python tests/run_checks.py
 
@@ -80,7 +80,7 @@ jobs:
           pip install pyinstaller==6.22.3 pyinstaller-hooks-contrib==2026.8 PyQt6==6.11.0 PyQt6-Qt6==6.11.2 PyQt6-sip==13.13.0 certifi
 
       - name: Run regression checks
-        # 48項目の退行テスト。1つでも落ちたらビルドもリリースも作らない。
+        # 退行テスト（tests/run_checks.py）。1つでも落ちたらビルドもリリースも作らない。
         # これが Windows 実機（GitHub のランナー）での検証を兼ねる
         run: python tests/run_checks.py
 
